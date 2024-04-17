@@ -10,7 +10,7 @@ You can use the key Command + Shift + P to open the command palette.
 
 With the command palette, you can do many things without leaving the current location.
 
-![command_palette](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/command_palette.png)
+![command_palette](./images/command_palette.png)
 
 ## VS Code Color Theme & Icon Theme
 
@@ -34,11 +34,11 @@ First, we need to download a related font from the Github, then install it on ou
 - Enter setting and open it, 
 - earch 'font family', and enter the font that we want to use.
 
-![font_family](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/font_family.png)
+![font_family](./images/font_family.png)
 
-We can set the font size and line height as well in the vs code.![font_size](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/font_size.png)
+We can set the font size and line height as well in the vs code.![font_size](./images/font_size.png)
 
-![line_height](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/line_height.png)
+![line_height](./images/line_height.png)
 
 There is a website where you can download a font that you like.[coding font](https://coding-fonts.netlify.app/fonts/codelia/)
 
@@ -48,31 +48,31 @@ There is a website where you can download a font that you like.[coding font](htt
 
 We can configure the tab size in the settings.
 
-![tab_size](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/tab_size.png)
+![tab_size](./images/tab_size.png)
 
 ### Rulers
 
 We can use this setting to render vertical rulers after a certain monospace characters.
 
-![rulers](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/rulers.png)
+![rulers](./images/rulers.png)
 
 ### Render Indent Guides
 
 This setting defaults on. It controls whether the editor should render indent guides.
 
-![render_indent_guides](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/render_indent_guides.png)
+![render_indent_guides](./images/render_indent_guides.png)
 
 ### Word Wrap
 
 It controls how lines should wrap.
 
-![word_wrap](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/word_wrap.png)
+![word_wrap](./images/word_wrap.png)
 
 ### Cursor Blink
 
 It controls the cursor animation style.
 
-![cursor_blink](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/cursor_blink.png)
+![cursor_blink](./images/cursor_blink.png)
 
 ## VS Code Explorer
 
@@ -88,11 +88,11 @@ And we can define the startup editor page when we launch the vs code editor.
 
 - `Command + Shift + P`, search `startup editor`, select a option
 
-![startup_eidtor](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/startup_eidtor.png)
+![startup_eidtor](./images/startup_eidtor.png)
 
 - Define the language when start the vs code editor.
 
-![language](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/language.png)
+![language](./images/language.png)
 
 ## Find and Replace all things in VS Code
 
@@ -136,7 +136,7 @@ If you work in a small team or a large team, you can configure the recommended e
 
 Then others who download the project and open it, there will be a prompt showing 'do you want to install the recommended extensions'. 
 
-![recommended_extesions](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/recommended_extesions.png)
+![recommended_extesions](./images/recommended_extesions.png)
 
 ## Setting Sync in VS Code
 
@@ -169,9 +169,9 @@ Emmet is an essential toolkit for web-developers.
 
 [emmet](https://emmet.io/)
 
-![emmet1](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/emmet1.png)
+![emmet1](./images/emmet1.png)
 
-![emmet2](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/emmet2.png)
+![emmet2](./images/emmet2.png)
 
 ## VS Code Command Line Tools
 

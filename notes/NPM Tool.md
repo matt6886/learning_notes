@@ -75,7 +75,7 @@ If you want to install the node packages under your project, you just need to us
 
 You can check the local packages in the node modules folder of the project, and if you want to check the global packages you installed globally, you may use the command `npm root -g` to check the path of the global modules. Then you can go to the folder and check the global packages.
 
-![npm_root](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/npm_root.png)
+![npm_root](./images/npm_root.png)
 
 ## Behind the command `npm install`
 
@@ -83,7 +83,7 @@ When a developer created a node package and upload it to the NPM service, all th
 
 If you execute the command `npm view lodash`, you will see there is a link called tarball, this is the source files of the package, and if you paste it into the browser, a file with `.tgz` extension will be download to your local folder. If you decompress it, you can see all the source files.
 
-![npm_view](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/npm_view.png)
+![npm_view](./images/npm_view.png)
 
 When we execute the command `npm install lodash`,  it will download the package with the link and save it in node modules folder of your project.
 
@@ -194,7 +194,7 @@ You just need to run the command `npm prune`, then all the extraneous packages w
 
 There is scripts property under the `package.json` file which supports a number of scripts and their preset life cycle events as well as arbitrary scripts.
 
-![npm_scripts](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/npm_scripts.png)
+![npm_scripts](./images/npm_scripts.png)
 
 We can use the built-in scripts and life cycle scripts to do some other things when we execute the scripts.
 
@@ -214,13 +214,13 @@ There is a utility call NPX. It mainly has two functions for this tool.
 
 When you are in the project folder, and you execute a command of a specific package, if you execute the command directly in the terminal, it won't work. You need to add the `npx` before the command. But if you put the command under scripts section of the `package.json` file, then it will work.
 
-![npx_local](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/npx_local.png)
+![npx_local](./images/npx_local.png)
 
 - Execute the global binaries
 
 When are out the project box, when you execute a command of a specific package, it will first download it and then execute command.
 
-![npx_global](/Users/zhanghaha/Desktop/IT/Learning/vs code/images/npx_global.png)
+![npx_global](./images/npx_global.png)
 
 ## Change the installation location of global NPM packages
 
