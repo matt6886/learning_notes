@@ -58,13 +58,39 @@ When you populate a variable with a specific value, the TypeScript will infer th
 
 When we define an array variable and assign it with some values, then the TypeScript will infer the type of this array variable. If you want to assign the array or the array element with another kind of values, then there will be a red squiggly line under the variable and prompt that you can't do that.
 
+### Union Type
+
+When we define an array with some different types, then if you hover on the variable, it will tell that the array will accept any of the type you defined in it.
+
+![ts_union_type](./images/ts_union_type.png)
+
 ### Object
 
 It's similar for object type. If you initialized a variable with an object values, and then you changed the type of some property to another type or add a new property for the object variable, it will also prompt you can't do that.
 
+Note that array is a specific object type, so we can assign an array object to an object, that's available.
+
+When we define the object type, we can indicate some property as an optional property, then if you hover on the property, you may see that the property can ben undefined, it's a union type.
+
+```javascript
+interface UserInfo<T> {
+  resource: ResourceType;
+  uid?: number;
+  data: T;
+}
+```
+
+```javascript
+type UserInfo<T> = {
+  resource: ResourceType;
+  uid?: number;
+  data: T;
+}
+```
 
 
-## Explicit Types
+
+## Explicit types
 
 Sometimes we may define a variable without giving it a value, then the TypeScript can't infer what type it is.
 
@@ -179,9 +205,69 @@ add(1, 2, 3);
 minus(1, 2, 3);
 ```
 
+### optional parameters
+
 In the functions, we may pass option parameters or default parameters.
 
 Usually, we need to specify the type of the parameters, and the TypeScript will infer the type of the return value.
+
+```javascript
+const sumAll = (a: number, b: number, c?: number) => {
+    return a + b + (c ? c : 0 )
+}
+```
+
+### default parameters
+
+When we define a function, we can also define some parameters as default parameters, which means if we don't pass a value to the parameter, then it will use the default value, but if we pass a value to it, then it will use the passed value instead.
+
+```javascript
+const sumAll = (a: number, b: number, c: number = 2) => {
+    return a + b + c
+}
+```
+
+### rest parameters
+
+When there are multiple parameters in a function, and we don't want explicitly specify all the parameters in parenthesis, then we can use rest parameters to receive them.
+
+```javascript
+const total = (a: number, ...num: number[]) => {
+  return (
+    a +
+    num.reduce((prev, cur) => {
+      return prev + cur;
+    })
+  );
+};
+console.log(total(1, 2, 3, 4));
+```
+
+We should use an array to receive the rest parameters, but when we pass values we don't need to pass an array. The rest parameter means the rest to the parameters.
+
+### Custom Type Guard & Never Type
+
+Sometime we may return a never type in a function. So when we will use it, if you create a throw in the function, then return type of the function will be a never type. Sometimes the typescript think there may be other possible conditions you don't list in the functions, but actually it will never happen, then you can also create a throw.
+
+```javascript
+const createError = (errMsg: string) => {
+    throw new Error(errMsg)
+}
+
+// custom type guard
+const isNumber = (value: any) => {
+    return typeof value === 'number' ? true : false
+}
+
+// use of never type
+const numberOrString = (value: number | string) => {
+    if (typeof value === 'string') return 'string'
+    if (isNumber(value)) return 'number'
+    return createError('This will never happen!')
+}
+```
+
+
 
 
 
@@ -207,24 +293,28 @@ const getUserInfo = (info: UserInfo, phone: string) => {
 
 ## Function Signature
 
-Sometimes we may define a function signature for a variable, then when we assign a real function to this variable, we need to match the function with the function signature exactly, or we will get errors.
+Sometimes there may be some functions which have the same function signature, then we can define their method signature as a type alias, and then we can use the type for other functions which have the same type in the future.
 
 ```javascript
-type UserInfo = { name: string; gender: string; age: number };
+type methodFunction = (a: number, b: number) => number
+const add:methodFunction = (a, b) => {
+    return a + b
+}
 
-// function signature
-let getUserInfo: (userInfo: UserInfo, tel: string) => void;
-
-getUserInfo = (info: UserInfo, phone: string) => {
-  console.log("user:", info, phone);
-};
-
-getUserInfo({ name: "Matt", gender: "man", age: 18 }, "123456");
+const substract: methodFunction = (a, b) => {
+    return a - b
+}
 ```
+
+When we define the other functions, the structure of the functions must match the type.
 
 
 
 ## The DOM & Type Casting
+
+**Type Casting & Assertion**
+
+> Type casting(also known as assertion) is a way to tell the compiler that you know more about the type of the value than it does. It is used to explicitly change the type of an expression from one type to another.
 
 The TypeScript can use all the functions to interact with the DOM as it is in JavaScript. And typescript can also infer the type of the DOM.
 
@@ -252,6 +342,34 @@ form.addEventListener("submit", (e: Event) => {
 ```
 
 With the casting mark, we never need the exclamation mark any more, because it will know that the value will never be empty.
+
+We can also use the angle bracket to covert the type, it's same. But this way won't work in TSX  file.
+
+```javascript
+const form = <HTMLFormElement>document.querySelector(".new-item-form")
+```
+
+When we use the type casting, the value which we want to convert should be a special type, if not, then we may get error. If we really want to change a normal type to another type with the type casting, then we may use the unknown to convert the normal type to a special type first, and then we can use the type casting.
+
+```javascript
+const stringOrNumber = (
+  a: number,
+  b: number,
+  c: "add" | "concat"
+): string | number => {
+  if (c === "add") return a + b;
+  return "" + a + b;
+};
+
+const val: string = stringOrNumber(1, 2, 'add') as string
+const val2: number = stringOrNumber(1, 2, 'concat') as number
+
+(10 as unknown) as string
+```
+
+
+
+
 
 
 
@@ -289,7 +407,15 @@ invOne.amount = 300;
 
 
 
-## Public & Private & Readonly
+### Public & Private & Readonly & protected
+
+> Public : the properties and method will default a public modifier if we don't specify any modifier to it.
+>
+> Private: private properties and method will only be accessed inside of the class.
+>
+> Readonly: we can't change the value, we can just read it.
+>
+> Protected: We can only access to the properties or methods inside of the class or derived class.
 
 From the top code, you can see that all the properties and functions can be accessed outside of the class, that's because there will be a public modifier in front of  them, it's a default behavior.
 
@@ -308,6 +434,94 @@ class Invoice {
 ```
 
 When we define the constructor function, if we add the modifier in front of the parameters, then we don't need to write assignment logic in the implementation part.
+
+If we and we don't want to assign value to a member property in the constructor method, and are sure that the member property will has a value, then we can write an exclamation mark after the variable.
+
+```javascript
+class Coder {
+  sencondLang!: string;
+  constructor(
+    public name: string,
+    private age: number,
+    readonly music: string,
+    protected lang: string = "TypeScript"
+  ) {}
+
+  public getAge() {
+    return this.age;
+  }
+}
+
+class WebDev extends Coder {
+  constructor(
+    public computer: string,
+    name: string,
+    age: number,
+    music: string
+  ) {
+    super(name, age, music);
+  }
+
+  getLang() {
+    return `I'm writing ${this.lang}`;
+  }
+}
+
+const sara = new WebDev("Mac", "Sara", 18, "Rock");
+console.log(sara.getLang());
+```
+
+### Static 
+
+When we define a class, we can specify some properties and method with static modifier, then it means these properties and methods only apply to the class, but not the instantiation object of the class.
+
+```javascript
+class Guitarist {
+  static count: number = 0;
+  static play(action: string) {
+    console.log(`${this.name} ${action} music`);
+  }
+  constructor(public name: string) {
+    Guitarist.count++;
+  }
+}
+const Lucy = new Guitarist("Lucy");
+const Jim = new Guitarist("Jim");
+const Lily = new Guitarist("Lily");
+console.log(Guitarist.count);
+Guitarist.play("stums");
+```
+
+### Get & Set 
+
+There are two keywords we can use in the typescript, which is `get` and `set`.
+
+We can use the  keyword `get` to get the value of a private property.
+
+And we can use the set keyword  `set` to set the value of a private property.
+
+```javascript
+class Bands {
+  private dataState: string[];
+  constructor() {
+    this.dataState = [];
+  }
+
+  public get data(): string[] {
+    return this.dataState;
+  }
+
+  public set data(value: string[]) {
+    if (Array.isArray(value) && value.every((el) => typeof el === "string")) {
+      this.dataState = value;
+    } else throw new Error("This value is not an array of strings");
+  }
+}
+
+const myBands = new Bands();
+myBands.data = ["ZZ", "AA"];
+console.log(myBands.data);
+```
 
 
 
@@ -373,6 +587,26 @@ const me: IsPersion = {
 
 console.log(me);
 ```
+
+
+
+## Type alias & interface
+
+We can use `interface` or `type` to define an object type.
+
+There may be a little confused when we will use interface and when use type, it's essentially the same, generally, we can use either of them. Usually we will use interface to define a class type or and object type. Because there may be some methods in a class object. And for type alias we can use it to define a alias type for  any typescript type.
+
+
+
+## Literal Type
+
+Sometimes the value of a variable may be limited, then we can define it with a literal type.
+
+```javascript
+let userName: 'Matt' | 'Tom' | 'Derric'
+```
+
+It's similar to the union type.
 
 
 
@@ -476,7 +710,7 @@ Tuple is another feature which we can only use in typescript.
 
 **What is tuple?**
 
-> Tuple is similar to array, we can't change the type to another type, but we can in array.
+> Tuple is similar to array, but it's more strict than array, we can't change the type to another type, but we can do in array.
 
 We will also use the square bracket to define a tuple type, but we need to specify every type in the square bracket.
 
