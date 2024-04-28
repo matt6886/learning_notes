@@ -525,6 +525,118 @@ console.log(myBands.data);
 
 
 
+## Index Signature & Keyof
+
+### Index Signature
+
+Index signature is useful in some case. There are two cases we will use it. 
+
+One scenario is that when we create an object we don't know the name of the keys, but we know the shape of the object, the type of the keys and the type of the values.
+
+Another scenario is when we want to access to the keys of an object dynamically.
+
+```javascript
+interface TrasactionObj {
+  [key: string]: number;
+  Pizza: number;
+  Books: number;
+  Job: number;
+}
+
+const todayTrasaction: TrasactionObj = {
+  Pizza: -5,
+  Books: -3,
+  Job: 50,
+};
+
+console.log(todayTrasaction.Pizza);
+
+const prop: string = "Pizza";
+console.log(todayTrasaction[prop]);
+
+const todayNet = (trasactions: TrasactionObj): number => {
+  let total = 0;
+  for (const trasaction in trasactions) {
+    total += trasactions[trasaction];
+  }
+  return total;
+};
+
+console.log(todayNet(todayTrasaction));
+```
+
+
+
+If we want to access a property which doesn't appear in the object, then we need to use index signature, then the typescript will think it maybe own this property in the future.
+
+```javascript
+interface Student {
+    [key: string]: string | number | number[] | undefined
+    name: string
+    GPA: number
+    classes?: number[]
+}
+
+const student: Student = {
+    name: 'Matt',
+    GPA: 6.5,
+    classes: [100, 200]
+}
+
+console.log(student.test)
+```
+
+### Keyof
+
+There is another way that even we don't specify the index signature in the object, we can also access the properties dynamically. That is `keyof`. The `keyof ` operator takes an object and produces the string or numeric literal union of its keys. 
+
+```javascript
+interface Student {
+    name: string;
+    GPA: number;
+    classes?: number[];
+  }
+  
+  const student: Student = {
+    name: "Matt",
+    GPA: 6.5,
+    classes: [100, 200],
+  };
+
+for (const key in student) {
+  console.log(`${key}: ${student[key as keyof Student]}`);
+}
+
+Object.keys(student).map((key) => {
+  console.log(student[key as keyof typeof student]);
+});
+```
+
+
+
+### Record
+
+There is another equivalent way as the index signature that we can use. That is the utility type `Record`.
+
+Please note, even we can use the Record instead of index signature, we still need to use the `keyof` to access to the key.
+
+```javascript
+type Streams = "salary" | "bonus" | "sidehustle";
+type Income = Record<Streams, number | string>;
+
+const monthlyIncome: Income = {
+  salary: 500,
+  bonus: 500,
+  sidehustle: 300,
+};
+
+for (const revenue in monthlyIncome) {
+  console.log(monthlyIncome[revenue as keyof Income]);
+}
+```
+
+
+
 ## Modules
 
 There will be many files in a real project, so we need to group the similar code into a single file. For example, we may have some files which are responsible for login, authentication, database and so on.
@@ -643,6 +755,8 @@ There is a specific feature called `generic` in typescript.
 
 > Generics means that the type is a variable.
 
+### Generics use in interface and functions
+
 We usually use generics in functions or interfaces. There may me some parameters or properties which type will be different in different situations, then we may need to define their type as a generics.
 
 ```javascript
@@ -673,6 +787,225 @@ console.log(userOne);
 ```
 
 We can pass different values when we initialize the variable which follow the interface.
+
+Below is a complex usage of generics.
+
+```javascript
+interface HasID {
+  user_id: string;
+}
+
+const getUerInformation = <T extends HasID, K extends keyof T>(
+  users: T[],
+  key: K
+): T[K][] => {
+  return users.map((user) => user[key]);
+};
+
+console.log(getUerInformation(users, "email_verified"));
+```
+
+### Generics use in class
+
+```javascript
+class StateObject<T> {
+  private data: T;
+  constructor(value: T) {
+    this.data = value;
+  }
+
+  get state() {
+    return this.data;
+  }
+
+  set state(value: T) {
+    this.data = value;
+  }
+}
+
+const store = new StateObject("Matt");
+console.log(store.state);
+store.state = "John";
+console.log(store.state);
+// will get an error when we assign another type to it
+// store.state = 12
+
+const store2 = new StateObject<(string|number|boolean)[]>(['Tom'])
+// It's fine
+store2.state = [15]
+```
+
+
+
+## Utility Types
+
+### Partial
+
+The `Partial` utility type is very useful. We can convert all the properties of an interface to optional properties.
+
+```javascript
+interface Assignment {
+  studentId: string;
+  title: string;
+  grade: number;
+  verified?: boolean;
+}
+
+const updateAssignment = (
+  assignment: Assignment,
+  propsToUpdate: Partial<Assignment>
+): Assignment => {
+  return { ...assignment, ...propsToUpdate };
+};
+
+const assign: Assignment = {
+  studentId: "Matt123",
+  title: "SE",
+  grade: 0,
+};
+
+console.log(updateAssignment(assign, { grade: 97 }));
+```
+
+### Required
+
+We can modify an interface type with the `Required` keyword in a function, then when we invoke the function pass the parameter the function, it will enforce us to pass all the required properties as well as the optional properties.
+
+```javascript
+const assignUpdateGrade = updateAssignment(assign, { grade: 97 });
+
+const recordAssignment = (assign: Required<Assignment>): Assignment => {
+  return assign;
+};
+
+recordAssignment({ ...assignUpdateGrade, verified: true });
+```
+
+### Readonly
+
+When we define a variable type with the `Readonly` keyword to modify the type , then all the properties in the type will be readonly, we can't change them later.
+
+```javascript
+const assignVerfied: Readonly<Assignment> = {
+  ...assignUpdateGrade,
+  verified: true,
+};
+// will get an error
+// assignVerfied.grade = 90
+```
+
+### Record<keys, type>
+
+Record utility is very popular, it is used to construct an object whose properties keys are `keys`, and whose property values are `type`. It is usually map the properties of a type to another type.
+
+```javascript
+type Students = 'Matt' | 'Tom'
+type LetterGrade = 'A' | 'B' | 'C' | 'D' | 'U'
+const finalGrades: Record<Students, LetterGrade> = {
+    Matt: 'A',
+    Tom: 'B'
+}
+```
+
+### Pick(Type, keys) & Omit(Type, keys)
+
+There is another utility type called `Pick`, we can pick some properties from a specific type and create a new type.
+
+```javascript
+type AssignResult = Pick<Assignment, "studentId" | "grade">;
+const score: AssignResult = {
+  studentId: "123",
+  grade: 98,
+};
+```
+
+Utility type `Omit` can use to ignore some properties in a  specific type and create a new type.
+
+```java
+type AssignPreview = Omit<Assignment, "grade" | "verified">;
+const preview: AssignPreview = {
+  studentId: "k123",
+  title: "Final Project",
+};
+```
+
+### Exclude & Extract
+
+You may be a little confused between these two utility types and the `Pick` and `Omit` utility types.
+
+The `Pick` and `Omit` are applied to the interface type, but the `Exclude` and `Extract` are applied to the string literal union types.
+
+```javascript
+type adjustGrade = Exclude<LetterGrade, 'U'>
+type hightGrade = Extract<LetterGrade, 'A' | 'B'>
+```
+
+### NonNullable
+
+The utility type `NonNullable` can exclude the null values from a specific type and create a new type.
+
+```javascript
+type AllPossibleGrades = 'Matt' | 'Tom' | null | undefined
+type NamesOnly = NonNullable<AllPossibleGrades>
+```
+
+### ReturnType
+
+When we use a third library or functions which are not created by ourselves, we can use the `ReturnType` to assign the return type of the functions to our new created type, then we can updated this type automatically. It's very useful.
+
+```javascript
+const createNewAssign = (title: string, points: number) => {
+  return { title, points };
+};
+
+type NewAssign = ReturnType<typeof createNewAssign>;
+
+const tsAssign: NewAssign = createNewAssign("Utitlity Type", 100);
+```
+
+### Parameters
+
+The utility type will extract the type of the parameters in a function and create a new type.
+
+```javascript
+type AssginParams = Parameters<typeof createNewAssign>
+const assignArgs: AssginParams = ['Generics', 100]
+const tsAssign2: NewAssign = createNewAssign(...assignArgs)
+```
+
+### Awaited
+
+This utility type is use to help the `ReturnType` of a Promise. When we want to get the return type of asynchronous function, usually we just want to get the type of the value returned from the Promise.
+
+```javascript
+interface User {
+    id: string
+    name: string
+    userName: string
+    email: string
+}
+const fetchUser = async (): Promise<User[]> => {
+  const data = await fetch("https://jsonplaceholder.typicode.com/users")
+    .then((res) => {
+      return res.json();
+    })
+    .catch((err) => {
+      if (err instanceof Error) {
+        console.log(err.message);
+      }
+    });
+  return data;
+};
+
+type FetchUserReturnType = Awaited<ReturnType<typeof fetchUser>>;
+fetchUser().then((users:FetchUserReturnType) => console.log(users));
+```
+
+
+
+
+
+
 
 
 
@@ -726,3 +1059,23 @@ resourse = ['Matt', 18, new Date()]
 ```
 
 We can see that we can change the type to another type in the array, but the type the each position in the tuple is fixed, we can't change to another type, we can change the value to another same value type.
+
+
+
+## Vite.js + TypeScript
+
+`Vite` is a very popular build tool.
+
+We can create a project with the Vite fast. Through this step, we can quickly create a project.
+
+- install node which version is greater than 18.0
+- Open an empty folder using vs code
+- Open the terminal
+- Execute the command `npm create vite@latest`
+- Specify the project name and select a language
+- Go into the project folder
+- Execute `npm i`
+- Execute `npm run dev`
+- Open the development server url
+
+You can quickly create a javascript or React project through it.
