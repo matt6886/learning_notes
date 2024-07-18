@@ -93,3 +93,158 @@ Here we will discuss when `useEffect` runs.  It will runs when a component is re
 Usually, we will use the hook with dependencies. If you pass an empty dependency to it, then the hook will runs only when the component is loaded. If you pass some dependencies to it, then the hook will be invoked after the dependencies are changed.
 
 There is one thing we need to notice is that `useEffect` is not synchronous, it is asynchronous. It will run after the components are loaded or updated.
+
+
+
+## Json Server Rest API
+
+Sometimes, we may need to send a request call when we want to fetch some data from a server and show the data in the App. Then we can use the `json-server` to mock the API call.
+
+**Step 1**
+
+Create a data folder and the related mock data file.
+
+**Step 2**
+
+```shell
+npx json-server -p 3500 -w data/db.json
+```
+
+You may need to use the node which version is greater than 18.
+
+When we start the local server with the json server, it will provide us a API root url.
+
+We can make operation like creating, deleting, updating and reading through API with it.And the related method will be POST, DELETE, PATCH and GET.
+
+> There is a website called JSONPlaceholder. You can send a request to this server, and get some face data for testing. It is powered by JSON Server + LowDB.
+
+[JSONPlaceholder](https://jsonplaceholder.typicode.com/)
+
+
+
+## Rules of hooks
+
+* Call hooks from react function components
+* Call hooks from custom hooks
+
+
+
+## Custom hooks
+
+A custom hook is a React function whose name starts with  `use` and that may call other hooks.
+
+When we want to share logic between different JavaScript functions, we extract it to a third function. Both components and hooks are functions, so this works for them too!
+
+```react
+import { useEffect, useState } from "react";
+
+const useWindowSize = () => {
+  const [windowSize, setWindowSize] = useState({
+    width: undefined,
+    height: undefined,
+  });
+
+  useEffect(() => {
+    const handleReize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    handleReize();
+
+    window.addEventListener("resize", handleReize);
+
+    return () => window.removeEventListener("resize", handleReize);
+  }, []);
+
+  return windowSize;
+};
+
+export default useWindowSize;
+```
+
+
+
+## State Management - `useContenxt` API 
+
+When we develop an application, there will be some states which may be used in different components, we can make these states as a global states and pass them into a context provider. We don't need to drill these props down to all the components.
+
+The states which are only used in a component, it can be contained within the component, it should not be included in the context provider.
+
+
+
+### Usage of Context
+
+* reate a context with the method `createContext`
+
+```react
+const DataContext = createContext({});
+```
+
+* Create a context provider
+
+```react
+export const DataProvider = ({ children }) => {
+  return (
+    <DataContext.Provider
+      value={{
+        ...
+      }}
+    >
+      {children}
+    </DataContext.Provider>
+  );
+};
+```
+
+We can create more than one context if we need.
+
+* Wrap the components which will share the states in the Provider
+
+```react
+function App() {
+  return (
+    <div className="App">
+      <Header title={"React JS Blog"} />
+      <DataProvider>
+        <Nav />
+        ...
+      </DataProvider>
+      <Footer />
+    </div>
+  );
+}
+```
+
+* Get the states from the context with hook `useContext`
+
+```react
+const { posts, setPosts } = useContext(DataContext);
+```
+
+The `DataContext` is the context which you created above.
+
+
+
+## easy-peasy
+
+`Easy Peasy` is an abstraction of Redux.
+
+It provides a reimagined API focussing on **developer experience**, allowing you to **quickly** and **easily** manage your state, whilst leveraging the strong **architectural guarantees** and providing integration with the extensive **eco-system** that Redux has to offer.
+
+[easy-peasy](https://easy-peasy.vercel.app/docs/introduction/)
+
+
+
+## Deploy your application to Netlify
+
+* Initialize your project with `git init`
+* Create a repository in Github and push your local repository to your remote repository
+* Log into the Netlify with your Github account
+* Create a new site with your project on Github
+* Deploy the selected project to Netlify
+* Open the link after you complete the deployment
+
+[Netlify Login](https://app.netlify.com/)
