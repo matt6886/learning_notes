@@ -248,3 +248,155 @@ It provides a reimagined API focussing on **developer experience**, allowing you
 * Open the link after you complete the deployment
 
 [Netlify Login](https://app.netlify.com/)
+
+
+
+
+
+## useCallback
+
+The hook is used to cache a function definition  between re-renders.
+
+```react
+const cachedFn = useCallback(fn, dependencies)
+```
+
+On the initial render, `useCallback` returns the `fn` function you have passed.
+
+During subsequent renders, it will either return an already stored `fn`  function from the last render (if the dependencies haven’t changed), or return the `fn` function you have passed during this render.
+
+```react
+const sum = useCallback(() => {
+    console.log(num1, num2);
+    return num1 + num2;
+}, [num1, num2]);
+
+useEffect(() => {
+    console.log(sum());
+}, [sum]);
+```
+
+
+
+
+
+## useMemo
+
+`useMemo` is used to cache the results of a function, and it will only recalculate the value only when the dependencies are changed.
+
+The difference between `useMemo` and `useCallback` is that `useMemo` is used to cache the results of a function, but `useCallback` is used to cache the definition of a function. We can use them according to different situations.
+
+```react
+  const getArray = () => {
+    for (let i = 0; i < 1000000000; i++) {
+      //do something expensive
+    }
+    return ["Dave", "Gray"];
+  };
+
+  const fib = useCallback((n) => {
+    return n <= 1 ? n : fib(n - 1) + fib(n - 2);
+  }, []);
+
+  const fibNumber = useMemo(() => fib(userNumber), [userNumber, fib]);
+
+  const myArray = useMemo(() => getArray(), []);
+
+  useEffect(() => {
+    console.log("New array");
+  }, [myArray]);
+```
+
+
+
+## useRef
+
+`useRef` is a React Hook that lets you reference a value that's not needed for rendering.
+
+* The ref object will keep the same between re-renders.
+
+So you can store information that between re-renders.
+
+* Changing it will not trigger a re-render.
+
+So refs are not appropriate for storing information you want to display on the screen.
+
+```react
+const ref = useRef(null)
+```
+
+
+
+## useReducer
+
+`useReducer` is a React Hook that lets you add a `reducer` to your component.
+
+In a real project, there are usually some different states in a component, then we can use `reducer` to manage the states.
+
+```react
+import { useReducer } from 'react'
+
+const reducer = (state, action) => {
+  switch (action.type1) {
+    case increment:
+    	return {...state, count: state.count + 1}
+    case decrement:
+      return {...state, count: state.count - 1}
+      defualt:
+      throw new Error()
+  }
+}
+
+const [state, dispatch] = useReducer(reducer, {count: 0})
+```
+
+With reducer, when need to pass the state down to the child components, we only need to pass two props, it's more simple.
+
+
+
+## useEffect VS useLayoutEffect
+
+### useEffect
+
+`useEffect` is a React Hook that lets you synchronize a component with an external system.
+
+
+
+### useLayoutEffect
+
+**`useLayoutEffect` is a version of `useEffect` that fires before the browser repaints the screen.**
+
+React guarantees that the code inside `useLayoutEffect` and any state updates scheduled inside it will be processed **before the browser repaints the screen.** 
+
+
+
+## useImperativeHandle
+
+`useImperativeHandle` is a hook that lets you customize the handle exposed as a `ref`.
+
+By default, components don't expose their DOM nodes to parent components, if a parent component want to access to the DOM nodes inside the child components, we need to import the `forwardRef` and wrap the child components in it, then the parent component can access all the DOM nodes inside the child components.
+
+However, if you don't want to expose the entire DOM nodes, you can use the `useImperativeHandle` and expose the handle a custom value instead.
+
+```react
+import { forwardRef, useRef, useImperativeHandle } from 'react';
+
+const MyInput = forwardRef(function MyInput(props, ref) {
+  const inputRef = useRef(null);
+
+  useImperativeHandle(ref, () => {
+    return {
+      focus() {
+        inputRef.current.focus();
+      },
+      scrollIntoView() {
+        inputRef.current.scrollIntoView();
+      },
+    };
+  }, []);
+
+  return <input {...props} ref={inputRef} />;
+});
+```
+
+Now, if the parent component gets a ref to `MyInput`, it will be able to call the `focus` and `scrollIntoView` methods on it. However, it will not have full access to the underlying `<input>` DOM node.
