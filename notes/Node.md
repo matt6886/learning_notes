@@ -2171,3 +2171,521 @@ apiRouter.use((err, req, res, next) => {
 })
 ```
 
+## 补充
+
+### Mongodb
+
+**概念**
+
+MongoDB是一个流行的开源文档型数据库，它使用类似 JSON 的文档模型存储数据，这使得数据存储变得非常灵活。
+
+MongoDB 是一个基于文档的 NoSQL 数据库，由 MongoDB Inc. 开发。
+
+MongoDB 旨在为 WEB 应用提供可扩展的高性能数据存储解决方案。
+
+MongoDB 是一个介于关系数据库和非关系数据库之间的产品，是非关系数据库当中功能最丰富，最像关系数据库的。
+
+**NoSQL简介**
+
+*NoSQL(NoSQL = Not Only SQL )，意即"不仅仅是SQL"。*
+
+NoSQL，指的是非关系型的数据库。NoSQL有时也称作Not Only SQL的缩写，是对不同于传统的关系型数据库的数据库管理系统的统称。
+
+NoSQL用于超大规模数据的存储。
+
+**RDBMS vs NoSQL**
+
+**RDBMS**
+\- 高度组织化结构化数据
+\- 结构化查询语言（SQL） (SQL)
+\- 数据和关系都存储在单独的表中。
+\- 数据操纵语言，数据定义语言
+\- 严格的一致性
+\- 基础事务
+
+**NoSQL**
+\- 代表着不仅仅是SQL
+\- 没有声明性查询语言
+\- 没有预定义的模式
+-键 - 值对存储，列存储，文档存储，图形数据库
+\- 最终一致性，而非ACID属性
+\- 非结构化和不可预知的数据
+\- CAP定理
+\- 高性能，高可用性和可伸缩性
+
+**什么是Mongodb**
+
+MongoDB 是一个文档型数据库，数据以类似 JSON 的文档形式存储。
+
+MongoDB 的设计理念是为了应对大数据量、高性能和灵活性需求。
+
+MongoDB使用集合（Collections）来组织文档（Documents），每个文档都是由键值对组成的。
+
+- **数据库（Database）**：存储数据的容器，类似于关系型数据库中的数据库。
+- **集合（Collection）**：数据库中的一个集合，类似于关系型数据库中的表。
+- **文档（Document）**：集合中的一个数据记录，类似于关系型数据库中的行（row），以 BSON 格式存储。
+
+<img src="./images/mongodb.png" />
+
+MongoDB 将数据存储为一个文档，数据结构由键值(key=>value)对组成，文档类似于 JSON 对象，字段值可以包含其他文档，数组及文档数组。
+
+**安装mongodb**
+
+1. 从官网下载mac版的mongodb并解压
+2. 在/usr/local目录下创建mongodb目录
+
+```shell
+sudo mkdir -p /usr/local/mongodb
+```
+
+3. 将解压后的文件夹中的文件移动到该目录下
+
+```shell
+sudo mv mongodb-macos-aarch64-8.0.9/* /usr/local/mongodb/
+```
+
+4. 创建mongodb的数据存储目录
+
+```shell
+mkdir -p ~/mongodb-data
+```
+
+5. 在`~/.zshrc`文件中配置mongodb的路径和启动别名
+
+```shell
+# mongoldb
+export PATH="/usr/local/mongodb/bin:$PATH"
+alias mongod-start="mongod --dbpath ~/mongodb-data"
+```
+
+6. 启动mongodb
+
+```shell
+mongod-start
+```
+
+**启动和关闭数据库**
+
+```shell
+# 启动数据库
+# 通常执行这个命令后，它会去找对应的本地数据存储目录
+# 由于我更改的默认的数据存储目录/data/db为~/mongdo-data,因此执行该命令时需要制定对应的数据存储目录
+# mongod
+mongod --dbpath ~/mongodb-dagta
+
+# 关闭数据库
+control + c
+```
+
+**连接mongodb数据库**
+
+```shell
+# 安装mongosh
+HOMEBREW_NO_AUTO_UPDATE=1 brew install mongosh
+```
+
+```shell
+# 连接本地mongodb数据库
+mongosh
+```
+
+****
+
+**安装 MongoDB Compass（图形化界面）**
+
+官网下载并安装mac版本(https://www.mongodb.com/try/download/compass)
+
+**mongodb数据库的基本操作**
+
+```shell
+# 查看显示所有数据库
+show dbs
+# 查看当前操作的数据库
+db
+# 切换到指定的数据库
+# 如果没有会新建，但是只有在添加数据到该数据库后，才会创建
+use itcast
+# 向集合中插入数据
+db.students.insert("name": "Matt")
+# 显示所有集合
+show collections
+# 查询集合
+db.students.find()
+```
+
+**使用nodejs操作mongodb数据库**
+
+1. 使用官方的`mongodb`包来操作
+
+https://www.npmjs.com/package/mongodb
+
+2. 使用第三方包`mongoose`来操作，它是在`mongoldb`包的基础上进行的进一步封装
+
+https://www.npmjs.com/package/mongoose
+
+https://mongoosejs.com/
+
+```js
+const mongoose = require("mongoose");
+
+// 连接到MongoDB数据库
+mongoose.connect("mongodb://127.0.0.1:27017/test");
+
+// 创建一个模型
+const Cat = mongoose.model("Cat", { name: String });
+
+// 实例化一个cat对象
+const kitty = new Cat({ name: "Zildjian" });
+// 持久化数据到本地数据库
+kitty.save().then(() => console.log("meow"));
+```
+
+```js
+import mongoose from "mongoose";
+
+// 1. 连接到MongoDB数据库
+mongoose.connect("mongodb://127.0.0.1:27017/test");
+
+const Schema = mongoose.Schema;
+
+// 2. 设计集合架构（表结构）
+const userSchema = new Schema({
+  username: {
+    type: String,
+    required: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  email: String,
+});
+
+// 3.将文档结构发布为模型
+// 该方法用于将一个架构发布为模型
+// 第一个参数：传入一个大写字母开头的字符串表示集合名称，
+// mongoose会自动将其转换为小写字母的复数作为集合的名称
+// 第二个参数：架构schema
+// 返回模型构造函数
+const User = mongoose.model("User", userSchema);
+
+// 4.当我们有了模型构造函数后，就可以对user集合的数据进行增删改查操作了
+const admin = new User({
+  username: "matt",
+  password: "123456",
+  email: "matt@gmail.com",
+});
+```
+
+* 插入数据
+
+```js
+// 5.插入数据
+const ret = await admin.save();
+console.log(ret);
+```
+
+* 查询数据
+
+```js
+// 6. 查询所有数据，返回一个数组
+const users = await User.find();
+console.log(users);
+// 查询一条数据，返回一个对象
+const users = await User.findOne();
+console.log(users);
+// 根据指定条件进行查询，返回一个数组
+const users = await User.find({ username: "matt" });
+console.log(users);
+// 根据指定条件并且只查询其中一条数据,返回一个对象
+const users = await User.findOne({ username: "matt" });
+console.log(users);
+```
+
+* 删除数据
+
+```js
+// 删除满足条件的一条数据
+const result = await User.deleteOne({ username: "matt" });
+console.log(result);
+//{ acknowledged: true, deletedCount: 1 }
+// 删除满足条件的多条数据
+const result = await User.deleteMany({ username: "matt" });
+console.log(result);
+// 根据id删除数据
+const result = await User.findByIdAndDelete("681c4e05f7485fd327a5098f");
+console.log(result);
+```
+
+* 更新数据
+
+```js
+// 根据id查询并更新数据
+const result = await User.findByIdAndUpdate("681c4e05f7485fd327a5098f", {
+  password: "111",
+});
+// 根据指定条件更新数据
+const result = await User.updateOne(
+  {
+    username: "tom",
+  },
+  {
+    password: "333",
+  }
+);
+console.log(result);
+```
+
+**MongoDB Atlas**
+
+MongoDB Atlas是MongoDB官方提供的一个云数据库托管服务，让开发者可以在不搭建服务器的情况下快速部署、管理和扩展MongoDB数据库。
+
+* MongoDB Atlas的主要特点
+
+1. **托管服务**
+
+   不需要你手动安装 MongoDB，可以直接在云上创建数据库。
+
+2. **多云支持**
+
+   可以部署在 AWS、Google Cloud、Azure 等云平台上。
+
+3. **自动化管理**
+
+   提供自动备份、监控、扩容、数据复制等功能。
+
+4. **可视化界面**
+
+   提供 Web 控制台管理数据库实例、集合、索引、用户权限等。
+
+5. **安全控制**
+
+   提供 IP 白名单、TLS 加密、用户认证和访问控制。
+
+6. **适用于生产环境**
+
+   非常适合中大型项目上线使用，也可以用于个人学习。
+
+* 使用步骤
+
+1. 访问 https://www.mongodb.com/cloud/atlas
+2. 注册账户并创建项目
+3. 创建一个 MongoDB 集群（选择免费/付费版本）
+4. 配置访问权限（设置数据库用户、添加本地 IP 白名单）
+5. 获取连接 URI，在本地项目中连接数据库
+
+```js
+mongoose.connect("your-atlas-uri", { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("Connected to MongoDB Atlas"))
+  .catch((err) => console.error("Connection error:", err));
+```
+
+**MongoDb Atlas区分develpoment和production环境**
+
+在使用 **MongoDB Atlas** 时，将 **开发环境（development）** 和 **生产环境（production）** 区分开来是非常重要的，主要从以下几个方面进行设置：
+
+1. 创建多个数据集群
+
+在 MongoDB Atlas 上，为开发和生产分别创建 **两个独立的集群**。
+
+- **优点**：开发环境不会影响生产数据，避免误操作。
+- **步骤**：
+  1. 登录 Atlas 控制台。
+  2. 点击左上角 Project → 创建一个新的项目（比如 MyApp-Dev、MyApp-Prod）。
+  3. 分别在每个项目里创建一个集群。
+  4. 每个集群分别设置：
+     - 不同的数据库用户
+     - 不同的 IP 白名单
+     - 不同的数据库名称
+
+2. 环境变量中配置连接URI
+
+在你的代码中使用 .env 文件区分开发和生产数据库连接，例如：
+
+```txt
+// .env.development:
+MONGO_URI=mongodb+srv://dev_user:dev_password@cluster-dev.mongodb.net/myapp-dev
+```
+
+```txt
+// .env.production:
+MONGO_URI=mongodb+srv://prod_user:prod_password@cluster-prod.mongodb.net/myapp-prod
+```
+
+```ts
+import mongoose from 'mongoose';
+
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+```
+
+3. 权限管理和安全设置
+
+- **IP 白名单**：
+  - 开发环境可以设置 0.0.0.0/0（所有 IP），但仅限测试使用。
+  - 生产环境应设置为特定服务器或开发者 IP。
+- **数据库用户权限**：
+  - 开发环境可以使用读写权限。
+  - 生产环境建议更严格的权限控制，比如只允许应用访问。
+
+4. 数据库命名规范建议
+
+- **开发环境数据库名**：myapp_dev
+- **生产环境数据库名**：myapp_prod
+
+5. 使用不同的环境配置工具
+
+如果你用的是 Node.js，可以使用：
+
+- [dotenv](https://www.npmjs.com/package/dotenv)
+- [cross-env](https://www.npmjs.com/package/cross-env) 配合 script
+- process.env.NODE_ENV 来区分当前是哪个环境
+
+**是否必须将 MongoDB Atlas 和你自己的 AWS 账号“关联”？**
+
+**不需要关联**。MongoDB Atlas 使用 AWS 作为云基础设施提供商时，它是在 **MongoDB 自己托管的 AWS 账号上创建资源**，并不是在你的 AWS 账号中。你无需“绑定”或“关联”你的 AWS 账号，也不需要登录 AWS 去管理这些服务器。
+
+**你自己的 AWS 账号什么时候可能需要与 Atlas 协作？**
+
+如果你在 **自己的 AWS 账号中**运行以下资源，并希望它们与 Atlas 安全、快速通信，可以考虑以下方式：
+
+1. 只是开发/调试用：无需关联
+
+只需要在 Atlas 添加你的 AWS EC2 或本地 IP 到 IP 白名单即可。
+
+2. 更安全的方式：配置 VPC Peering（可选）
+
+你可以将你自己 AWS 账号的 VPC 与 Atlas 的 VPC 建立 VPC Peering，这样：
+
+- 数据不会经过公网，提高安全性和延迟性能。
+- 你需要在 AWS 和 Atlas 双方都配置 peering 和路由。
+
+3. 其他集成
+
+- 用 **AWS Secrets Manager** 存储 Mongo URI
+- 用 **AWS Lambda** 调用 Atlas，需要保证网络打通
+
+**总结**
+
+| **场景**                       | **是否需要关联自己的 AWS**                      |
+| ------------------------------ | ----------------------------------------------- |
+| 仅开发或部署简单应用           | ❌ 不需要，直接使用连接 URI 并开通 IP 白名单即可 |
+| 生产环境 + 高安全性要求        | ✅ 可选，建议配置 VPC Peering                    |
+| 想用自己的 AWS 管理 Mongo 实例 | ❌ 不行，Atlas 不在你的 AWS 账号中运行           |
+
+
+
+### 项目上线部署
+
+* 上传代码到仓库（Github）
+* 购买云服务器
+* 连接服务器与软件安装
+
+1. 复制服务器公网IP地址
+2.  连接到对应的服务器，并且安装相关软件（git，nodejs，mongodb等）
+
+* 代码克隆服务启动
+
+1. 克隆代码到服务器并安装相关依赖
+2. 启动服务器
+
+* 域名购买与解析
+
+1. 域名购买后通常需要等待审核。注意；如果是国内服务器域名，还需要做域名备案
+2. 域名解析，就是把域名和对应服务器地址对应起来，添加记录，把域名和服务器ip地址对应上即可。
+
+* 配置HTTP证书
+
+1. 工具地址（https://certbot.eff.org/）
+2. 安装certbot`install certbot`
+3. 管理员命令运行`certbot certonly --standlone`
+4. 更改服务端代码配置
+
+<img src="./images/https_cert.png" />
+
+5. 更新证书，证书有效期为3个月
+
+```shell
+# 一般更新
+certbot renew
+# 强制更新
+certbot --force-renewal
+```
+
+## AWS
+
+### 学习内容
+
+1. 学习AWS的先决条件
+
+* 网络基础知识（入门AWS云计算）
+  * 客户端与服务器计算
+  * IP地址和DNS
+  * 带宽与延迟
+  * 网络-路由器，交换机和防火墙
+* 操作系统/虚拟机
+* Linux命令基础知识
+* 编程语言
+* 创建AWS账户注意事项及必要配置
+  * 创建aws账户及免费套餐的坑
+  * 配置账号及创建账号套餐
+
+2. 基本概念
+
+* AWS全球基础设施
+  * 区域
+  * 可用性
+* 服务
+  * 网络（虚拟私有云VPC）
+    * Amazon VPC概述
+    * VPC基础知识
+    * 安全组和网络ACL
+  * 计算（弹性计算云EC2）
+    * Amazon EC2概述
+    * 启动EC2实例
+    * EC2 Instance Connect和SSH
+  * 存储 Amazon S3概述
+  * 数据库
+    * RDS（关系型数据库服务）
+    * 亚马逊DynamoDB
+  * 安全（IAM身份和访问管理）
+    * AWS IAM概述
+    * IAM用户、组、角色和策略
+    * 创建一个IAM用户
+
+### 学习AWS的先决条件
+
+**AWS账号创建**
+
+1张信用卡+1个电子邮件，创建的账户为root用户，我们可以使用IAM服务创建其他的AWS用户或者创建用户、组。可以将多个用户放入组中，创建角色，用于服务或其他身份带入，以及创建策略，策略定义了我们分配给组，用户以及角色的权限。一般情况下我们不会使用root用户登录。
+
+![image-20250509161712905](/Users/matt/Desktop/Learning/learning_notes/notes/aws_account_create.png)
+
+当我们访问AWS时，最初我们是通过访问AWS管理控制台登录，它是一个基于web的平台，可以使用web浏览器访问。
+
+ 当我们登录时，IAM服务用于身份验证。因此当我们创建自己的个人账号，使用这些账号登录时，IAM委托人将使用控制台API或CRI向IAM 进行身份验证。一旦我们使用授予对应权限的IAM委托人完成身份验证后， 就可以在全世界AWS不同的区域中，创建AWS资源。例如可以启动EC2实例，RDS数据库，S2存储桶和ALB负载接收器。
+
+![image-20250509162947813](/Users/matt/Desktop/Learning/learning_notes/notes/images/aws_account_create2.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
