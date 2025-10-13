@@ -494,8 +494,8 @@ ap-northeast-1d
 
 ![image-20250512194629898](/Users/matt/Desktop/Learning/learning_notes/notes/images/aws13.png)
 
-> - Security Group（SG）是“虚拟防火墙”**，控制**实例级别（EC2）**的访问权限
-> - Network ACL（ACL）是“子网层的访问控制”**，控制**整个子网**的入站和出站流量
+> - Security Group（SG）是“虚拟防火墙”**，控制**实例级别（EC2）的访问权限
+> - Network ACL（ACL）是“子网层的访问控制”**，控制**整个子网的入站和出站流量
 >
 > | **概念**       | **类比**                                             |
 > | -------------- | ---------------------------------------------------- |
@@ -937,7 +937,7 @@ nmap -p 80,443 yourdomain.com #检测远程服务器是否开放了 Web 服务�
 
 ### 打包AMI
 
-一般情况下，选择停掉ec2实例，然后再打包ami，当然如果你的服务器很多用户再用，也可以不停服务直接打包AMI。
+一般情况下，选择停掉ec2实例，然后再打包ami，当然如果你的服务器很多用户在用，也可以不停服务直接打包AMI。
 
 **操作步骤**
 
@@ -1177,7 +1177,7 @@ docker run --name deeplearnaws-mysql \
  
  mysql -u root -p -h 127.0.0.1 #密码12345678
  show databases;
- use blgodb;
+ use blogdb;
  select * from user;
  
  exit;
@@ -1218,7 +1218,7 @@ nmap 127.0.0.1
 
 ## NAT 用完就删
 
-NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹性IP会一起删除。
+NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹性IP需要解绑并一起删除。
 
 > .**当你删除 NAT 网关时：**
 >
@@ -1251,18 +1251,12 @@ NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹�
 
 * 打开vpc控制台，点击创建子网
 * 输入子网名称，选择vpc，可用区并输入子网的CIDR地址：172.16.11.0/24，创建
-* 选择刚创建的子网，选择路由表，编辑路右边，选择我们之前创建的web路由表，这样其就可以访问外网了。
+* 选择刚创建的子网，选择路由表，编辑路右表，选择我们之前创建的web路由表，这样其就可以访问外网了。
 
 2. 在新的可用区子网添加 web-ec2 实例 - deeplearnaws-web2
 
 * 打开ec2控制台，选择我们之前创建的AMI来开启新的ec2实例
 * 输入服务器名称，deeplearnaws-web2，密钥对选择我们之前创建的，选择vpc和上步骤创建的子网，启用自动分配公网ip，选择之前创建的web安全组，网络接口主要IP：172.16.11.10，配置存储8g，启动实例。
-
-
-
-
-
-
 
 
 
@@ -1278,6 +1272,24 @@ NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹�
 * 启动web服务器
 * 建立目标组
 * 建立ALB负载均衡器
+
+### 操作步骤
+
+1. 建立目标群组
+
+* 登录到ec2控制台，点击目标群组，创建目标组
+* 选择实例，端口（目前选择80端口，生成环境会使用443端口），选择我们的vpc，协议版本http1，运行状况选择根目录，设置高级运行状况检查，5-2-5-10
+* 注册目标：选择可用的实例，加入到目标组，创建目标组
+
+2. 创建ALB负载均衡器
+
+* 点击负载均衡器，创建负载均衡器，
+* 选择ALB负载均衡器，选择创建
+* 输入负载均衡器名称deeplearnaws-web-alb，选择面向互联网，ip4地址，选择我们的vpc，可用区选择我们创建的1a，1c，对应的子网选择web1和web2
+* 安全组设置：选择创建一个新的安全组，deeplearnaws-web-alb-security-group, 只开放80端口（生产环境要443端口），选择该安全组
+* 侦听器和路由：选择我们之前创建的目标组，创建负载均衡器
+
+3. 选择负载均衡器，拷贝DNS名称处的地址，在浏览器打开，刷新页面可以看到页面的数据会在web1和web2服务器之间来回切换。如果关掉一台服务器后，则会一直显示另一台服务器的数据。
 
 
 
@@ -1309,6 +1321,90 @@ NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹�
 
 
 
+> ## NS 名字服务器
+>
+> 域名中的**名字服务器（Name Server，简称 NS）**，是互联网域名系统（DNS）中的一个核心角色，它的作用是：**告诉其他人：你这个域名的 DNS 信息在哪里可以找到。**
+>
+> 当别人访问你的域名（比如 example.com）时，**他们不知道这个域名应该指向哪个服务器 IP**，于是：
+>
+> 1. 首先会查找这个域名的**名字服务器（NS 记录）**
+> 2. 然后去这个名字服务器上问：“example.com 应该解析到哪个 IP 地址？”
+> 3. 名字服务器就会返回这个域名的 **A 记录**（或 CNAME、MX、TXT 等）
+>
+> **名字服务器就像你的域名“地址簿”的保管人**，外部系统通过它来获取你域名的详细解析信息
+>
+> 你注册了域名 myapp.com，并使用 AWS Route 53 托管 DNS。AWS 会分配一组 NS 记录，比如：
+>
+> ```bash
+> ns-123.awsdns-45.com  
+> ns-456.awsdns-23.org  
+> ns-789.awsdns-67.co.uk  
+> ns-321.awsdns-89.net
+> ```
+>
+> 这些就是你 myapp.com 的 **名字服务器**。
+>
+> - 当用户访问 myapp.com
+> - DNS 系统会去查这几个 NS 服务器
+> - 然后再从这些服务器中获取该域名的具体解析记录，比如：
+>   - A 记录 → 12.34.56.78
+>   - MX 记录 → 邮件服务器
+>   - TXT 记录 → 域名验证信息
+>
+> | **名词**             | **解释**                                    |
+> | -------------------- | ------------------------------------------- |
+> | **名字服务器（NS）** | 告诉世界：我的 DNS 信息在哪个服务器上       |
+> | **NS 记录**          | 域名系统中的一类记录，指定名字服务器地址    |
+> | **作用**             | 帮助全网找到你的 DNS 信息，进行 IP 地址解析 |
+>
+> <img src="/Users/matt/Desktop/Learning/learning_notes/notes/images/aws-ns.png" alt="aws-ns" style="zoom:50%;" />
+>
+> ### **Step 1: DNS Query for example.com**
+>
+> - 用户在浏览器中输入 example.com
+> - 系统会先查询本地 DNS 缓存，如果没有命中，就发起 DNS 查询请求
+>
+> ### **Step 2: Query Root Name Server**
+>
+> - 根名称服务器是全球 DNS 的起点，负责告诉你：
+>
+>   > “我不知道 example.com 是谁，但 .com 顶级域的服务器在这儿。”
+>
+> - 它返回 .com 域名的 TLD（顶级域）服务器列表
+>
+> ### **Step 3: Query TLD Name Server**
+>
+> - TLD Name Server 是顶级域（如 .com, .org, .net）的管理者
+>
+> - 它接着告诉你：
+>
+>   > “我不管理 example.com，但你可以去问它的权威 Name Server，地址是 ns1.exampledns.com 等。”
+>
+> - 它返回 example.com 的 **授权 Name Server（NS 记录）**
+>
+> ### **Step 4: Query Name Server for example.com**
+>
+> - 这是 example.com 的权威名字服务器，通常托管在 Route 53、Cloudflare 等服务商上
+>
+> - 它负责管理这个域名的全部 DNS 记录（A、CNAME、MX、TXT 等）
+>
+> - 它回答请求者：
+>
+>   > “example.com 对应的 IP 地址是 93.184.216.34（A 记录）”
+>
+> ### **最终结果**
+>
+> - DNS 查询返回 IP 地址 → 浏览器使用这个 IP 去连接服务器 → 网站打开 ✅
+>
+> | **步骤** | **谁响应**       | **作用**                   |
+> | -------- | ---------------- | -------------------------- |
+> | Step 1   | DNS 客户端       | 发起解析请求               |
+> | Step 2   | 根 Name Server   | 告诉你哪去找 .com 的管理者 |
+> | Step 3   | TLD Name Server  | 告诉你谁在管理 example.com |
+> | Step 4   | 权威 Name Server | 返回具体记录（如 IP 地址） |
+
+
+
 ## Route53 - 解析我的Web服务
 
 ### 知识点
@@ -1325,6 +1421,83 @@ NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹�
   * 启动ec2-web1
   * 设置域名IP解析
 
+### 操作步骤
+
+1. 注册域名，目前freenom已经无法使用，生产环境直接使用aws的注册域名即可
+2. 设置托管区（route53）
+
+* 搜索route53进入route53的控制台，选择控制面板中的创建托管区域
+* 输入域名名称，选择公共托管区，创建托管区
+
+3. 简单路由策略，将域名和我们web服务器的ip绑定
+
+```bash
+# 在域名注册商注册域名后， 不会马上生效，可能需要注册一个NS服务器后，估计12个小时，一般最多72个小时才能生效。因为域名服务器需要全球服务器同步的。
+dig deeplearnaws.ml @8.8.8.8
+```
+
+* 登录ec控制台，启动一台web服务器，生成动态的ip地址后
+* 登录route53控制台，选择我们创建的托管区域，点击创建记录，选择简单路由，记录类型选择A记录，值输入我们刚启动的web服务器的ip地址，点击创建。
+* 注意：生产环境中，需要申请一个固定ip，像弹性ip，将这个弹性ip和我们的web服务器绑定。
+
+
+
+## Route53 - 解析我的ELB服务
+
+### 知识点
+
+使用Route53  - 解析我的ELB服务器
+
+### 采用策略 - 简单路由
+
+对于为您的域执行给定功能的单一资源（例如为 example.com 网站提供内容的 Web 服务器），可以使用该策略。
+
+### 设置DNS解析
+
++ 启动ec2-web1, ecs2-web2
++ 确认ELB和目标组状态
++ 设置域名ELB解析
++ 域名访问
+
+### 操作步骤
+
+1. 启动web1和web2服务器
+2. 打开ec2控制台，找到负载均衡器中的目标群组，点击目标，查看两台web服务器的状态
+3. 打开route53的控制台，选择托管区，点击进入，创建一个新的记录，记录名称输入alb.deeplearnaws.ml, 值的位置选择别名，选择负载均衡器，选择区域，选择我们创建的负载均衡器，创建。
+
+
+
+## 全球部署 - 新加坡
+
+### 知识点
+
+* 在全球其他区域部署我们的Web服务
+
+### 实战演习
+
++ 将东京区的AMI拷贝到新加坡区
++ 从新加坡区启动EC2实例
++ 配置安全组SG，使SSH和HTTP可以访问
++ 配置子网路由表
++ 修改索引显示内容
+
+```bash
+$ docker exec -it deeplearnaws-web sh
+>root $ vi app.js
+$ docker container restart deeplearnaws-web
+```
+
+### 操作步骤
+
+1. 将东京区的AMI拷贝到新加坡区
+
+* 打开ec2控制台，找到我们的AMI，选择后点击操作中的复制AMI, 选择目标区域为新加坡，其他的保留原样，点击复制AMI
+
+2. 从新加坡区启动EC2实例
+
+* 切换到奥新加坡区
+* 登录ec2控制台，选择刚创建的AMI，然后创建新的ec2实例。（这里没有单独创建vpc和子网，都用的默认的）
+
 
 
 ## Route53 - 分流东京和新加坡区，多值应答路由
@@ -1337,12 +1510,24 @@ NAT网关收费比较贵，用完就删。删除NAT网关后，其绑定的弹�
 
 ### 实战演习
 
-* 启动各区的服务器
-* 设置DNS健康检查
-  * 东京IP
-  * 新加坡IP
-* 设置多值应答路由
-* 停止东京区服务-确认DNS解析结果
++ 启动各区的服务器
++ 设置DNS健康检查
+  - 东京区IP
+  - 新加坡区IP
++ 设置多值应答路由 - global.deeplearnaws.ml
++ 停止东京区服务, 确认DNS解析结果
+
+### 操作步骤
+
+1. 启动各区的服务器
+2. 设置DNS健康检查
+
+* 登录route53控制台，选择运行状况检查，点击创建运行状况检查，输入名字，其他的根据需要选择，ip选择东京和新加坡的web服务器的地址i，分别创建两个状况检查。
+
+3. 设置多值应答路由
+
+* 选择route53控制台中的托管区域，选择我们之前创建的托管区，点击进入。
+* 点击创建记录，输入global.deeplearnaws.ml，A记录，值输入web服务ip地址，路由策略选择多值应答，运行状况检查选择我们上一步骤创建状况检查记录，记录ID随便输入，例如tokyo01。分别创建两个记录。
 
 
 
@@ -1380,25 +1565,562 @@ RDS是被管理的数据库服务，让开发人员免去系统（OS，DB）管�
 
 
 
+## MySQL@RDS - 准备工作 - VPC子网,安全组,DB子网组,参数组,选项组
+
+### 知识点
+
+* 建立RDS MySQL前的准备工作
+
+### 实战演习
+
+**VPC子网,安全组,DB子网组,参数组,选项组**
+
++ VPC子网
+  - Name: deeplearnaws-db-1c
+  - CIDR: 172.16.21.0/24
++ 安全组
+  - Name: deeplearnaws-db-sg <- 可以直接使用，但生产环境时应只保留3306端口
++ DB子网组
+  - Name: deeplearnaws-db-subnet-group
++ 参数组
+  - Name: deeplearnaws-db-parameter-group
++ 选项组
+  - Name: deeplearnaws-db-option-group
+
+### 操作步骤
+
+1. 创建子网
+
+登录vpc控制台，选择子网，创建子网，选择子网的vpc，可用区，创建
+
+2. 创建安全组
+
+安全组可以使用之前创建的安全组，如果是RDS服务，安全组只需开通3306端口就好，不需要22端口
+
+3. RDS准备
+
+* 创建子网组
+
+搜索RDS登录其控制台，选择左侧的子网组，点击创建子网组，输入子网组的名称，选择可用区（可选多个），选择子网（可选多个），点击创建子网组
+
+* 创建参数组
+
+点击参数组，创建参数组，输入参数组名称，选择引擎类型：MySQL Community，参数系列：mysql5.7，点击创建
+
+* 创建选项组
+
+点击选项目，创建组，输入名称，选择引擎：mysql，选择主要引擎版本：5.7，创建
+
+
+
+## 建立MySQL数据库服务
+
+### 知识点
+
+* 建立 MySQL RDS 数据库服务
+
+### 实战演习
+
++ 标准创建
++ MySQL
+  - 5.7.31
++ 免费套餐
++ 数据库实例标识符
+  - komadb
++ 凭证设置
+  - root/12345678
++ 数据库实例大小
+  - db.t2.micro
++ 存储
+  - SSD
+  - 20G-1000G
++ 连接
+  - deeplearnaws-vpc
++ 子网组
+  - deeplearnaws-db-subnet-group
++ 安全组
+  - deeplearnaws-db-sg
++ 可用区
+  - 任意
++ 密码身份验证
++ 其他配置
+  - 初始数据库名称: blogdb
+
+### 操作步骤
+
+1. 搜索RDS登录控制台，选择数据库，创建数据库
+2. 点击标准创建，引擎类型选择：MySQL，引擎版本选择：5.7.44，（要求选择**RDS 扩展支持**，否则无法创建）模版选择：免费套餐，可用区和持久性：默认，设置区：数据库实例名称mysqldev，凭证设置：用户名root，凭证管理：自我管理，输入密码和确认密码，实例配置：默认免费套餐即可，存储：SSD，20GB，连接选择：vpc，数据库子网组，公网访问：否，vpc安全组：选择我们db安全组，可用区上一节已经设置好了，数据库身份验证：密码身份验证（生产环境选择密码与IAM数据库身份验证），其他配置：数据库名称blogdb，数据库参数组和选项组选择上一节创建的，点击创建数据库
+3. 创建数据库需要几分钟的时间，创建好之后，点击刚创建的数据库实例，可以看到有一个终端节点，这个相当于我们数据库的ip地址。
+
+
+
+## 连接MySQL - MySQL客户端工具
+
+### 知识点
+
+* 安装 MySQL 客户端工具，连接到 MySQL RDS 数据库实例
+
+### 实战演习
+
++ 安装 MySQL 客户端命令行工具
++ 连接到 MySQL 服务器实例
++ 建立数据表
++ 添加数据
+
+### 操作步骤
+
+```bash
+sudo yum -y update
+# $ sudo yum -y install mysql
+# Amazon 2023 安装mysql
+# 1.下载并安装 MySQL 8.4 YUM repo
+sudo dnf install -y https://dev.mysql.com/get/mysql80-community-release-el9-4.noarch.rpm
+# 2. 启用 repo 并更新缓存
+sudo dnf makecache
+# 3. 确认 MySQL 仓库是否启用
+dnf repolist enabled | grep mysql
+# 输出内容
+# mysql-connectors-community MySQL Connectors Community
+#mysql-tools-community      MySQL Tools Community
+# 4. 输出说明你并没有启用 mysql80-community 源，所以无法安装 mysql-community-client
+# 手动启用 mysql80-community 源
+sudo dnf config-manager --enable mysql80-community
+sudo dnf makecache
+# 再安装 MySQL 客户端
+sudo dnf install -y mysql-community-client
+
+# 连接RDS数据库
+mysql -h mysqldev.cbcbjcjywvwn.ap-northeast-1.rds.amazonaws.com -u root -p
+
+Enter password:
+mysql> show databases;
+mysql> use blogdb;
+mysql> create table blogdb.user (id int, name varchar(255));
+mysql> show tables;
+mysql> insert into blogdb.user values (1, 'Koma');
+mysql> insert into blogdb.user values (2, 'Xiaoma');
+mysql> insert into blogdb.user values (3, 'MySql');
+mysql> select * from blogdb.user;
+mysql> exit;
+```
+
+
+
+## 连接MySQL - phpMyAdmin 管理工具
+
+### 知识点
+
+* 使用 phpMyAdmin 管理工具连接 MySQL 数据库实例
+
+### phpMyAdmin官网
+
+https://www.phpmyadmin.net/
+
+### Docker.Hub
+
+https://hub.docker.com/r/phpmyadmin/phpmyadmin/
+
+### 实战演习
+
+1. 连接ec2实例，然后创建`docker-compose.yml`
+
+2. 在docker-compose.yml文件中编写
+
+```yml
+# docker-compose.yml
+version: '3' 
+services:
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: web_phpmyadmin
+    ports:
+      - 80:80
+    environment:
+      - PMA_HOST=mysqldev.chouew60464e.ap-northeast-1.rds.amazonaws.com
+      - PMA_USER=root
+      - PMA_PASSWORD=12345678
+```
+
+```bash
+# 编译服务
+sudo docker-compose build
+# 容器启动(精灵线程)
+sudo docker-compose up -d
+# 查询容器状态
+sudo docker-compose ps
+```
+
+
+
 ## 连接MySQL - Node.js Web应用程序
 
 ### 知识点
 
-使用Node.js Web应用程序连接MySQL数据库实例
+* 使用 Node.js Web应用程序连接 MySQL 数据库实例
+
+### Web镜像(Docker Hub)
+
+https://hub.docker.com/r/komavideo/deeplearnaws-web
+
+### 实战演习
+
+```bash
+# 从DockerHub上获取deeplearnaws-web镜像
+docker pull komavideo/deeplearnaws-web:latest
+docker run --name deeplearnaws-web -p 80:3000 -d --restart=always komavideo/deeplearnaws-web:latest
+docker container ls -a
+# 编辑调整
+docker exec -it deeplearnaws-web sh
+>root $ vi app.js
+...
+mysqldev.cbcbjcjywvwn.ap-northeast-1.rds.amazonaws.com
+...
+docker container restart deeplearnaws-web
+```
 
 
 
-## AWS CLI - AWS认证必须会的命令行工具
+### AWS CLI - AWS认证必须会的命令行工具
+
+### AWS CLI 命令行工具
 
 ### AWS CLI是什么
 
-AWS Command Line Interface(AWS CLI)是一种开源工具，让您能够在命令行Shell中使用命令与AWS服务进行交互。仅需最少配置，即可使用AWS CLI开始运行命令，以便从终端程序中命令提示符实现与浏览器的AWS管理控制台所提供的功能等同的功能。
+AWS Command Line Interface (AWS CLI) 是一种开源工具，
+让您能够在命令行 Shell 中使用命令与 AWS 服务进行交互。
+仅需最少的配置，即可使用 AWS CLI 开始运行命令，以便从终端
+程序中的命令提示符实现与基于浏览器的 AWS 管理控制台所提供的
+功能等同的功能。
+
+### 官网
+
+https://aws.amazon.com/cn/cli
+
+### 用户指南
+
+https://docs.aws.amazon.com/zh_cn/cli/latest/userguide/cli-chap-welcome.html
+
+### CLI参考
+
+https://awscli.amazonaws.com/v2/documentation/api/latest/reference/index.html
 
 ### AWS操作方法
 
-* 管理控制台（Browser）
-* AWS CLI
-* AWS SDK
++ 管理控制台(Browser)
++ AWS CLI
++ AWS SDK
+
+### CLI版本
+
++ 1.x
++ 2.x
+
+### 使用方法
+
++ AWS CLI 本地安装(Windows, Mac, Linux)
++ CloudShell
++ Cloud9
++ EC2(Amazon Linux自带CLI)
+  - 演示时间
+
+### 课程计划
+
++ 基础教学
+  - AWS 中文入门开发教学
++ 进阶教学
+  - AWS CLI 中文进阶开发教学
+
+
+
+## AWS CLI 的安装(Mac Linux Install)
+
+### 知识点
+
+* AWS CLI 的安装
+
+### 官网
+
+#### AWS CLI v1
+
+https://docs.aws.amazon.com/zh_cn/cli/latest/userguide/install-cliv1.html
+
+#### AWS CLI v2
+
+https://docs.aws.amazon.com/zh_cn/cli/latest/userguide/install-cliv2.html
+
+### 实战演习
+
+#### 安装Mac CLI v2版本
+
+https://docs.aws.amazon.com/zh_cn/cli/latest/userguide/install-cliv2-mac.html
+
+```bash
+#################################################
+# 安装版本确认
+$ aws --version
+```
+
+#### 安装Linux(Ubuntu) CLI v2版本
+
+https://docs.aws.amazon.com/zh_cn/cli/latest/userguide/install-cliv2-linux.html
+
+```bash
+# 下载最新CLI程序版本
+$ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+# 解压缩
+$ sudo apt install -y unzip
+$ unzip awscliv2.zip
+# 管理员权限安装
+$ sudo ./aws/install
+# 安装版本确认
+$ aws --version
+# 使用帮助
+$ aws help
+```
+
+
+
+## AWS CLI 授权设置(Credential file settings)
+
+### 知识点
+
+* AWS CLI 授权设置
+  - 建立IAM用户，创建访问密钥
+  - 授权CLI身份
+
+### 实战演习
+
+#### 建立IAM用户，创建访问密钥
+
++ Name: deeplearnaws-cli
+  - 允许编程访问
+  - 建立密钥对(Access Key, Secret Access Key)
+
+#### 授权CLI身份
+
+```bash
+# 授权CLI身份(指定profile方式 - AWS Best Practices)
+$ aws configure --profile deeplearnaws-cli
+>AWS Access Key ID [None]: FFUff89898u89vxv
+>AWS Secret Access Key [None]: Ahy789yvhjxlFDoajsdflajia90sdfjsaa
+>Default region name [None]: ap-northeast-1
+>Default output format [None]: json
+# 授权文件存储位置(★★★★★内容涉及敏感信息★★★★★)
+$ ls ~/.aws
+# 列出所有配置数据
+$ aws configure list --profile deeplearnaws-cli
+# 列出可用配置文件名称
+$ aws configure list-profiles --profile deeplearnaws-cli
+# 列出当前区的VPC
+$ aws ec2 describe-vpcs --profile deeplearnaws-cli
+# 查询过滤显示
+$ aws ec2 describe-vpcs --profile deeplearnaws-cli --query 'Vpcs[].VpcId'
+$ aws ec2 describe-vpcs --profile deeplearnaws-cli --query 'Vpcs[0].VpcId'
+$ aws ec2 describe-vpcs --profile deeplearnaws-cli --query 'Vpcs[1].VpcId'
+# 列出S3存储桶
+$ aws s3 ls --profile deeplearnaws-cli
+```
+
+#### 删除授权Key
+
+避免安全问题
+
+
+
+## AWS CLI - 操作 EC2 实例，一切皆在命令中
+
+### 知识点
+
+* 使用AWS CLI命令行操作 EC2 实例
+
+### 官网
+
+https://docs.aws.amazon.com/zh_cn/cli/latest/userguide/cli-services-ec2.html
+
+### 实战演习
+
+```bash
+# 建立一个EC2实例
+$ aws ec2 run-instances --profile deeplearnaws-cli \
+    --image-id ami-0ab886fa8b0af1186 \
+    --count 1 \
+    --instance-type t2.micro \
+    --key-name deeplearnaws-ssh-key \
+    --subnet-id subnet-0b7f77d791582e6b3 \
+    --security-group-ids sg-0e30a29941920eb78 \
+    --associate-public-ip-address \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ec2_from_cli}]'
+# 显示EC2内容，赋予过滤条件和查询出哪些字段
+$ aws ec2 describe-instances --profile deeplearnaws-cli \
+    --filters "Name=instance-type,Values=t2.micro" \
+    --query "Reservations[].Instances[].{Instance:InstanceId,Subnet:SubnetId,Instance:Tags}"
+# 终止EC2实例
+$ aws ec2 terminate-instances --profile deeplearnaws-cli \
+    --instance-ids i-03ad4ae25615c672b 
+```
+
+
+
+## Cloud9 - 云端集成开发环境(IDE)
+
+### 知识点
+
+* Cloud9 - 云的集成开发环境(IDE)的基本介绍
+
+### 官网
+
+https://aws.amazon.com/cn/cloud9/
+
+### 功能
+
++ 只需一个浏览器即可进行编码，无需配置各种开发环境
++ 实时共同编写代码，团队协作
++ 直接通过终端访问AWS资源
++ 迅速开始新项目
++ 无缝集成CodeSeries(Commit,Build,Deploy,Pipeline)
++ 轻松构建无服务器应用程序，小马选择Cloud9的主要原因
+
+### 支持多种语言
+
++ JavaScript(Node.js)
++ Python
++ PHP
++ Ruby
++ Go
++ C++
++ etc.
+  - https://docs.aws.amazon.com/cloud9/latest/user-guide/language-support.html
+
+### 集成工具
+
++ AWS CLI
++ Docker
++ Git
+  - CodeCommit
+  - Github
+
+
+
+## Cloud9 - 建立自己的开发环境
+
+### 知识点
+
+* 建立自己的 Cloud 9 开发环境
+
+### 实战演习
+
+#### 建立环境
+
++ Name: deeplearnaws-cloud9
++ Create a new EC2 instance for environment (direct access)
++ t2.micro (1 GiB RAM + 1 vCPU)
++ Amazon Linux 2 (recommended)
++ Cost-saving setting: After 30 minutes
++ VPC
+  - deeplearnaws-vpc
+  - deeplearnaws-web-1a
+
+#### 环境确认
+
+```bash
+# 各种内置软件版本确认
+$ aws --version
+$ node -v
+$ npm -v
+$ tsc --version
+$ python -V
+$ pip -V
+$ php -v
+$ ruby -v
+$ go version
+$ java -version
+$ g++ -v
+$ git version
+$ docker version
+```
+
+#### Node.js
+
+*app.js*
+
+```js
+console.log("Helo Cloud9.")
+$ node app.js
+```
+
+#### Python
+
+*main.py*
+
+```python
+print("Helo Cloud9.")
+python main.py
+```
+
+
+
+## Cloud9 - Node.js的开发与调试
+
+### 知识点
+
+* 在 Cloud9 环境中开发调试 Node.js 应用程序
+
+### 实战演习
+
+```bash
+$ mkdir expressweb
+$ cd expressweb
+$ npm init -y
+$ npm install express --save
+$ nano app.js
+...
+$ curl http://httpbin.org/ip
+$ node app.js
+```
+
+### app.js
+
+```js
+'use strict';
+const express = require("express")
+const app = express()
+
+/////////////////////////////////////////////////
+// 定义中间件(进阶)
+/////////////////////////////////////////////////
+const debug = (req, res, next) => {
+    console.log("middleware.debug ->", req.method, req.url)
+    next()
+}
+app.use(debug)
+
+/////////////////////////////////////////////////
+// 基础使用
+/////////////////////////////////////////////////
+// 默认根路径
+app.get("/", (req, res) => {
+    console.log("->", req.url)
+    res.send("<h1>Helo Cloud9.</h1>")
+})
+
+// 返回json格式，API主用
+app.get("/json", (req, res) => {
+    res.json({
+        result: 'ok'
+    })
+})
+
+/////////////////////////////////////////////////
+// 启动服务
+/////////////////////////////////////////////////
+const PORT = process.env.PORT || 8080
+app.listen(PORT, (err) => {
+    if (err) {
+        console.error("我去，出错啦！",)
+    }
+    console.log("正常服务中...", "http://127.0.0.1:" + PORT)
+})
+```
 
 
 
@@ -1406,36 +2128,96 @@ AWS Command Line Interface(AWS CLI)是一种开源工具，让您能够在命令
 
 ### 知识点
 
-S3的基础知识
+* S3的基础知识
+
+### 官网
+
+https://aws.amazon.com/cn/s3
 
 ### 基础介绍
 
-Amazon Simple Storage Service(Amazon S3)是一种对象存储服务，提供行业领先的可扩展性，数据可用性，安全性和性能。这意味着各种规模和行业的客户都可以使用S3来存储并保护各种用例（如数据湖，网站，移动应用程序，备份和还原，存档，企业应用程序，IoT设备和大数据分析）的数据，容量不限。Amazon S3提供了易于使用的各种功能，因此您可以组织数据并配置精细调整过的使用权限控制，从而满足特定的业务，组织和合规性要求。
+Amazon Simple Storage Service (Amazon S3) 是一种对象存储服务，
+提供行业领先的可扩展性、数据可用性、安全性和性能。这意味着各种规模和行业
+的客户都可以使用 S3 来存储并保护各种用例（如数据湖、网站、移动应用程序、
+备份和还原、存档、企业应用程序、IoT 设备和大数据分析）的数据，容量不限。
+Amazon S3 提供了易于使用的管理功能，因此您可以组织数据并配置精细调整过
+的使用权限控制，从而满足特定的业务、组织和合规性要求。Amazon S3 可达到
+99.999999999%（11 个 9）的持久性，并为全球各地的公司存储数百万个应用
+程序的数据。
 
 ### 用途
 
-* 数据文件保存
-* 日志文件保存
-* 备份快找保存
-* 静态网站主机
-* 数据湖（data lake）
++ 数据文件保存
++ 日志文件保存
++ 备份快照保存
++ 静态网站主机
++ 数据湖(data lake)
 
-### 安全性
+### 价格
 
-* SSE-S3
-* SSE-KMS
-* SSE-C
-* CSE
+https://aws.amazon.com/cn/s3/pricing
 
-### 存储分类
+### AWS 免费套餐
 
-* S3标准-适用于频繁访问的数据的通用存储
-* S3智能分层-适用于具有未知或变化的访问模式的数据
-* S3标准 - IA - 不频繁访问
-* S3单区 - IA - 不频繁访问
-* S3 Glacier - 长期存储
-* S3 Glacier Deep Archive - 长期存档
-* S3 Outposts - 本地存储
+作为 AWS 免费套餐的一部分，您可以免费开始使用 Amazon S3。注册后，
+AWS 新客户将在一年内的每个月中获得 S3 标准存储类中的 5GB S3 存储空间、
+20000 个 GET 请求、2000 个 PUT、COPY、POST 或 LIST 请求以及 15GB
+的数据传出量。
+
+### 安全性(重要)
+
++ SSE-S3
++ SSE-KMS
++ SSE-C
++ CSE
+
+### 存储分类（认证必考内容）
+
++ S3 标准
+  - 适用于频繁访问的数据的通用存储
++ S3 智能分层
+  - 适用于具有未知或变化的访问模式的数据
++ S3 标准 - IA
+  - 不频繁访问
++ S3 单区 - IA
+  - 不频繁访问
++ S3 Glacier
+  - 长期存档
++ S3 Glacier Deep Archive
+  - 长期存档
++ S3 Outposts
+  - 本地存储
+
+*具体区别*
+
+https://aws.amazon.com/cn/s3/storage-classes
+
+
+
+##  S3 - 基本的使用
+
+### 知识点
+
+* S3 - 基本的使用方法
+
+### 实战演习
+
++ 创建存储桶
++ 上传文件
++ 版本管理
++ 删除文件
++ 删除存储桶
+
+*上述功能都可以使用 AWS CLI 命令行工具完成。*
+
+**操作步骤**
+
+1. 搜索s3进入控制台，点击创建存储桶
+2. 存储桶类型选择：通用，输入存储桶名称，对象所有权：ACL已禁用，阻止所有公开访问，存储桶版本控制：开启，输入标签，默认加密，存储桶密钥：启用，对象锁定：禁用，创建存储桶
+3. 创建文件夹，点击创建文件夹，输入文件夹名称，点击创建
+4. 上传文件，可以通过拖拽或者点击上传的方式上传文件，点击上传，点击添加文件，然后选择文件上传。在属性中可以选择存储类型。
+5. 删除文件，选中文件，然后点击删除
+6. 删除存储桶，删除前，必须先清空存储桶
 
 
 
@@ -1443,17 +2225,37 @@ Amazon Simple Storage Service(Amazon S3)是一种对象存储服务，提供行�
 
 ### 知识点
 
-* 使用S3快速搭建静态网页网站
-* 使用Route 53 服务解析网站域名
+* 使用 S3 快速搭建静态网页网站
+* 使用 Route 53 服务解析网站域名
 
 ### 实战演习
 
-* 设计域名
-* 建立同名的S3存储桶
-* 上传网页文件到存储桶中
-* 设置存储桶为静态网站公开
-* 设置Route 53，关联S3存储桶
-* 确认动作
++ 设计域名
+  - Name: blog.deeplearnaws.ml
++ 建立同名的 S3 存储桶
++ 上传网页文件到存储桶当中
++ 设置存储桶为静态网站公开
++ 设置 Route53, 关联 S3 存储桶
++ 确认动作
+
+*https部分将配合 Cloudfront + AWS Certificate Manager(ACM) 完成, 专门做专题分享*
+
+### index.html
+
+```html
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深学AWS</title>
+</head>
+<body>
+    <h1>你好，AWS。</h1>
+</body>
+</html>
+```
 
 
 
@@ -1461,23 +2263,36 @@ Amazon Simple Storage Service(Amazon S3)是一种对象存储服务，提供行�
 
 ### 知识点
 
-* 存储桶内容在全球区域间进行复制
+* S3 存储桶内容在全球区域间进行复制
+
+### 官网
+
+https://docs.aws.amazon.com/zh_cn/AmazonS3/latest/userguide/replication.html
 
 ### 实战演习
 
-* 在东京区建立存储桶
-  * Name： woyaofuzhi
-  * 启用版本控制
-* 在新加坡建立存储桶
-  * Name： woyaofuzhi_backup
-  * 启用版本控制
-* 在东京区建立复制规则
-  * 指定全文件
-  * 复制到新加坡存储桶
-  * 启用复制时间控制（S3 RTC）
-* 查看复制结果
-  * 一般需要等待15分钟左右
-  * 错误排查
++ 在东京区建立存储桶
+  - Name: woyaofuzhi
+  - 启用版本控制
++ 在新加坡区建立存储桶
+  - Name: woyaofuzhibackup
+  - 启用版本控制
++ 在东京区建立复制规则
+  - 指定全文件
+  - 复制到新加坡区存储桶
+  - 启用复制时间控制(S3 RTC)
++ 查看复制结果
+  - 一般需要等待15分钟左右
+  - 错误排查
+    * https://docs.aws.amazon.com/zh_cn/AmazonS3/latest/userguide/replication-troubleshoot.html
+
+### 操作步骤
+
+1. 登录s3控制台，选择创建存储桶，输入存储桶名称，输入名称，启用版本控制，其他保持默认选择。创建
+2. 切换到新加坡区后，再创建一个新的存储桶，和上一步骤一样，启用版本控制，其他保持默认。
+3. 点击第一步创建的存储桶，切换到管理栏，选择创建复制规则。输入规则名称，状态启用；源存储桶，选择全部复制；目标，此账户中的另一个存储桶，点击浏览，选择我门要复制的目标存储桶；IAM角色选择新建角色；加密：不加密（生产环境需要加密保证安全）；目标存储类，可以根据需要更改（因为时备份，可以选择收费低的类型）；其他复制选项：复制时间控制(RTC)；保存。
+4. 点击第一个存储桶，上传一个文件，可以在存储桶指标位置，选择复制规则，查看相关信息。
+5. 打开第二个存储桶，可以看到刚刚上传的图片。
 
 
 
@@ -1485,18 +2300,31 @@ Amazon Simple Storage Service(Amazon S3)是一种对象存储服务，提供行�
 
 ### 知识点
 
-通过设置网关终端节点，使私有网段中的EC2也可以访问到S3服务
+* 通过设置网关终端节点，使私有网段中的EC2也可以访问到S3服务
+
+### 官网
+
+https://docs.aws.amazon.com/zh_cn/codeartifact/latest/ug/create-s3-gateway-endpoint.html
+
+### 实战演习
+
+![image-20250513091411637](/Users/matt/Desktop/Learning/learning_notes/notes/images/aws20.png)
 
 ### 实战步骤
 
-* 建立一个可以访问S3的角色 - KomaRoleS3FullAccess
-* 在私有网段启动一个EC2实例，赋予S3访问的角色
-* 在私有网段EC2种访问S3
-* 在VPC中建立一个网关终端节点，绑定到私有网段的路由表
-* 稍等片刻（添加到路由表需要时间）
-* 再次从私有网段中的EC2访问S3，确认动作
++ 创建一个可以访问S3的角色
+  - KomaRoleS3FullAccess
++ 在私有网段启动一个EC2实例, 赋予S3访问的角色
++ 在私有网段EC2中访问S3
++ 在VPC中建立一个网关终端节点，绑定到私有网段的路由表
++ 稍候片刻(添加到路由表需要时间)
++ 再次从私有网段中的EC2访问S3，确认动作
 
-![image-20250513091411637](/Users/matt/Desktop/Learning/learning_notes/notes/images/aws20.png)
+### 动作确认脚本
+
+```bash
+$ aws s3 ls --region ap-northeast-1
+```
 
 
 

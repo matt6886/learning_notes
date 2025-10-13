@@ -517,7 +517,7 @@ function Demo() {
 
 
 
-### `i18next react-i18next i18next-browser-languagedector`
+### `i18next react-i18next i18next-browser-languagedetector`
 
 这三个库经常搭配在 React 项目中使用，用于实现**国际化（i18n）功能**。
 
