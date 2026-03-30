@@ -116,7 +116,7 @@ fs.readFile(path.join(__dirname, '/files/1.txt'), 'utf-8', (err, dataStr) => {
 可以获取路径的最后一部分，经常用这个方法获取路径中的文件名
 
 * 第一个参数表示路径
-* 第二个参数表示文件的扩展名，可选的
+* 第二个参数表示要去掉文件的扩展名，可选的
 * 返回路径的最后一部分
 
 ```javascript
@@ -124,6 +124,7 @@ const filePath = 'a/b/c/index.html'
 const basePath = path.basename(filePath)
 const basePathWithoutExt = path.basename(filePath, '.html')
 console.log(basePath, basePathWithoutExt)
+// index.html index
 ```
 
 ### 获取文件的扩展名
@@ -136,6 +137,7 @@ console.log(basePath, basePathWithoutExt)
 ```javascript
 const ext = path.extname(filePath)
 console.log(ext)
+// .html
 ```
 
 ## http模块
@@ -1273,7 +1275,7 @@ app.listen(80, () => {
 
 CORS(cross-origin Resource Sharing，跨域资源共享), 由一系列http响应头组成，这些http响应头决定浏览器是否阻止前端js代码跨域获取资源。
 
-浏览器的同源安全策略默认会组织网页跨域获取资源，但是如果服务器配置了CORS相关的HTTP响应头，就可以解除浏览器的跨域访问限制。
+浏览器的同源安全策略默认会阻止网页跨域获取资源，但是如果服务器配置了CORS相关的HTTP响应头，就可以解除浏览器的跨域访问限制。
 
 <img src="./images/cors.png" />
 
@@ -1441,7 +1443,7 @@ $("#btnJSONP").on("click", function () {
 * MySQL数据库（目前使用最广泛、流行度最高的开源免费数据库；Community + Enterprise）
 * Orancle数据库（收费）
 * SQL Server数据库（收费）
-* Mongodb数据库（Communi + Enterprise）
+* Mongodb数据库（Community + Enterprise）
 
 其中MySQL，Orancle以及SQL Server属于传统型数据库（又叫做关系型数据库或SQL数据库），这三者的设计理念相同，用法比较类似；
 
@@ -1589,7 +1591,7 @@ WHERE字句用于限定选择的标准。在SELECT、UPDATE、DELETE语句中均
 | 操作符  | 描述         |
 | ------- | ------------ |
 | =       | 等于         |
-| <>      | 不但于       |
+| <>      | 不等于       |
 | >       | 大于         |
 | <       | 小于         |
 | >=      | 大于等于     |
