@@ -151,7 +151,7 @@ do {
 
 **什么是闭包**
 
-闭包是自包含的代码块，它可以在函数中传递和使用。它能捕获并保存它作用于外的常量或变量。
+闭包是自包含的代码块，它可以在函数中传递和使用。它能捕获并保存它作用域外的常量或变量。
 
 简单讲：闭包是可以向变量一样传递的函数。并且能记住创建时周围环境的值。
 
@@ -673,6 +673,253 @@ Swift Concurrency 通过 async/await、Task 和 Actor让异步代码像同步代
 
 
 
+### Swift Concurrency vs CGD理解
+
+Swift Concurrency是Swift提供的一套结构化并发模型。用于更安全、更清晰的编写并发代码。
+
+它主要包含以下几个核心组件：
+
+* async/await
+* Task
+* TaskGroup
+* Actor
+
+GCD存在问题
+
+* 回调地狱：嵌套严重，可读性差，难以维护
+
+```swift
+DispatchQueue.global().async {
+    fetchA {
+        fetchB {
+            fetchC {
+                ...
+            }
+        }
+    }
+}
+```
+
+* 状态管理混乱：多线程容易产生数据竞态（race condition)， 需要加锁。GCD没有提供数据安全模型。
+
+```swift
+var count = 0
+
+DispatchQueue.global().async {
+    count += 1
+}
+```
+
+* 线程管理复杂：需要手动切换线程，关注执行上下文
+
+```swift
+DispatchQueue.main.async { }
+DispatchQueue.global().async { }
+```
+
+* 错误处理困难：分散在回调中，不统一。
+
+```swift
+fetch { result in
+    switch result {
+    case .success:
+    case .failure:
+    }
+}
+```
+
+* 生命周期不可控：无父子任务，无自动取消，容易泄露。
+
+**Swift Concurrency核心思想**
+
+* 结构化并发：任务必须有清晰的生命周期和层级关系
+
+```swift
+Task {
+    await taskA()
+    await taskB()
+}
+// 父任务控制子任务
+// 自动取消
+// 生命周期清晰
+```
+
+* async/await：同步写法表达异步，替代callback和completion hanlder，代码更直观，容易维护。
+
+```swift
+let result = await fetch()
+```
+
+* Actor: 数据隔离中心。Actor是Swift Concurrency的最大亮点。保证同一时间只有一个任务访问数据。GCD需要手动加锁。
+
+```swift
+actor Counter {
+    var value = 0
+    
+    func increment() {
+        value += 1
+    }
+}
+```
+
+* Task: 轻量（类似协程），自动调度，支持取消。
+
+```swift
+Task {
+    await fetch()
+}
+```
+
+* TaskGroup：用于管理一组并发子任务的结构化工具。解决：并发执行多个任务 + 收集结果。
+
+```swift
+func fetchAll() async -> [Int] {
+    await withTaskGroup(of: Int.self) { group in
+        
+        group.addTask { await fetchA() }
+        group.addTask { await fetchB() }
+        group.addTask { await fetchC() }
+        
+        var results: [Int] = []
+        
+        for await result in group {
+            results.append(result)
+        }
+        
+        return results
+    }
+}
+// 所有任务一起跑，动态添加任务，按完成顺序返回，生命周期绑定（group结束，任务结束），自动取消，所有任务自动取消。
+
+// async let 适用于少量固定并发任务
+async let a = fetchA()
+async let b = fetchB()
+```
+
+**Swift Concurrency常见坑**
+
+* Actor重入问题
+* 忘记await
+* 主线程问题
+* Task泄露
+* 强引用问题
+* Cancellation不会自动终止，必须手动检查。
+* 线程不固定
+
+### Actor vs @MainActor理解
+
+**Actor**
+
+是用于保护共享数据的并发隔离模型。
+
+* 内部数据不能被外部直接访问
+* 同一时间只允许一个任务访问。
+* 避免数据竞态。
+
+```swift
+actor Counter {
+    var value = 0
+}
+```
+
+**@MainActor**
+
+是一个全局Actor，用于保证代码在主线程执行。
+
+```swift
+// 传统写法
+DispatchQueue.main.async {
+  label.text = "Hello"
+}
+
+// Swift Concurrency
+await MainActor.run {
+  label.text = "Hello"
+}
+
+// 或者
+@MainActor
+func updateUI() {
+  label.text = "Hello"
+}
+```
+
+MainActor = 数据隔离 + 线程约束
+
+
+
+### Runloop理解
+
+Runloop是一个事件循环机制，用于让线程持续运行，并在有任务时处理任务，没有任务时休息。本质就是让线程活着，有事做事，没事睡觉。
+
+**核心思维**
+
+Runloop = while(true)循环。
+
+```swift
+while (true) {
+    if 有任务 {
+        处理任务
+    } else {
+        休眠
+    }
+}
+```
+
+Runloop本质是一个事件驱动循环。负责监听事件（Event）、分发事件（Diapatch)、控制线程休眠/唤醒。
+
+**核心结构**
+
+Runloop有几个关键组件：
+
+* Source（事件源）：输入事件
+
+  * source0：手动触发，不依赖系统
+
+  ```swift
+  performSelector
+  ```
+
+  * source1: 系统触发，基于内核（Mac Port），系统自动唤醒，例如触摸事件、网络事件
+
+* Timer： 定时器，定时触发任务
+
+```swift
+Timer.scheduledTimer
+```
+
+* Observer: 观察者，用于监听Runloop的状态变化，例如即将进入循环、即将休眠、被唤醒。
+
+* Mode： Runloop的运行模式。Runloop同一时间只能运行在一个模式下。
+
+  * NSDefaultRunloopMode：默认模式，用于普通UI、timer、网络事件
+  * UITrackingRunloopMode：滑动模式，scrollview滚动，手势跟踪，优先处理滑动事件。
+  * NSRunloopCommonModes：不是一个mode，是标记集合。（集合标签）本质：Common = Default + Tracking。加入common mode的任务，会同时在多个mode下执行。
+
+  Mode本质：每个mode都有对应的source、timer和observer。Runloop切换Mode时，只处理当前Mode的内容。
+
+滑动时timer停止的原因：
+
+滑动时mode会切换到UItrackingRunloopMode，而timer默认是在NSDefaultRunllopMode运行。解决方案将timer标记为common mode，也就是Timer 被加入到 “CommonModes 标记对应的所有 Mode”。
+
+**Runloop工作流程**： 监听 -> 执行 -> 休眠 -> 唤醒 
+
+```swift
+1. 进入 RunLoop
+2. 通知 observers（即将处理）
+3. 处理 timers
+4. 处理 sources
+5. 如果没有任务 → 休眠
+6. 被唤醒（事件到来）
+7. 继续处理
+```
+
+**Runloop与线程的关系**
+
+每个线程都有Runloop，主线程默认开启，子线程默认不开启。
+
+
+
 ### 计算属性、存储属性以及lazy属性理解
 
 **存储属性**
@@ -688,7 +935,7 @@ struct Person {
 
 **计算属性**
 
-不占用内容，在使用时通过计算获取。其本质是一个函数。
+不占用内存，在使用时通过计算获取。其本质是一个函数。
 
 ```swift
 struct Square {
@@ -1063,7 +1310,7 @@ swift有4个安全规则，其中两个最重要。
 * 规则2
 
 ```swift
-再super.init()前，不能使用self
+在super.init()前，不能使用self
 ```
 
 **swift对使用self的定义**
@@ -1453,10 +1700,8 @@ struct StringContainer: Container {
 
 ```swift
 protocol Collection {
-
     associatedtype Element
     associatedtype Index
-
 }
 ```
 
@@ -1480,7 +1725,7 @@ struct IntStack: Stack {
 
 **associatedtype限制**
 
-带associatedtype的procotol不是完整的类型。不能直接作为变量类型。
+带associatedtype的procotol不是完整的类型。不能直接作为变量类型或者函数参数使用。因为编译器无法确定具体的关联类型（类型不完整、不确定）。
 
 ```swift
 protocol Container {
@@ -1491,7 +1736,7 @@ protocol Container {
 }
 ```
 
-必须使用：
+必须借助泛型（Generics）、some（不透明类型）、any（存在类型/类型擦除）来解决。
 
 | **方式** | **用途**         |
 | -------- | ---------------- |
@@ -1499,17 +1744,30 @@ protocol Container {
 | some     | 返回某种具体类型 |
 | any      | 类型擦除         |
 
-* 使用泛型：泛型约束
+* 解决方案1：使用泛型，泛型约束
 
 ```swift
 func process<C: Container>(_ container: C) {
     let item = container.getItem(at: 0)
     print(item)
 }
+// C.Item类型是确定的
 // 如果写var container: Container会报错
 // Protocol 'Container' can only be used as a generic constraint
 // because it has Self or associated type requirements
 // 因为 协议不知道 Item 是什么类型。
+
+func test<T: Container>(c: T) {
+    // T.Item 是确定的
+}
+
+struct Box<T>: Container {
+    typealias Item = T
+    func add(_ item: T) {}
+}
+// 优点：类型安全（编译期确定），无性能损耗（静态派发）。
+test(Box<Int>())
+test(Box<String>())
 ```
 
 * 使用Any
@@ -1520,14 +1778,31 @@ var container: any Container
 // any Container 只能调用不依赖 Item 的方法
 ```
 
-* 使用some
+* 解决方案3：使用some（不透明类型）
 
 ```swift
 func makeContainer() -> some Container {
     IntContainer()
 }
 // some表示：返回某一种具体类型，但不告诉你是哪种
+// 编译器知道具体类型，但调用方不知道
+
+// 使用场景
+var body: some View
 ```
+
+在Swift中，带有associatedtype的协议不能直接作为变量或者参数类型使用，因为它本身不是一个完整类型，编译器无法确定关联类型。
+
+为了解决这种问题，通常由三种方式：
+
+* 使用泛型，在编译器确定类型，是最推荐的方式。
+* 使用some，表示返回某个具体但隐藏的类型，常用于返回值。
+* 使用any，表示可以存储任意符合协议的类型，但需要配合类型擦除才能使用其方法。
+
+本质区别在于：
+
+* 泛型和some都是编译器就确定类型
+* any是运行时动态分发，存在性能损耗。
 
 **associatedtype类型约束**
 
@@ -1551,7 +1826,6 @@ struct UserCache: Cache {
 ```swift
 protocol Container {
     associatedtype Item
-    
     func add(_ item: Item)
 }
 
@@ -1567,7 +1841,396 @@ struct NumberContainer: ComparableContainer {
 
 
 
+### 类型擦除（Type Erasure）理解
 
+```swift
+// 问题
+protocol Container {
+    associatedtype Item
+    func add(_ item: Item)
+}
+
+var c: any Container
+c.add(1) // ❌ 报错
+// 因为c的真实类型不确定->Item也不确定->无法调用方法
+```
+
+**类型擦除到底是什么**
+
+本质：把泛型信息、关联类型信息隐藏掉，用一个统一的壳包装起来，对外暴露固定接口。
+
+**核心思想**
+
+类型擦除做了三件事情：
+
+* 捕获具体类型
+
+```swift
+init<C: Container>(_ container: C)
+// 把具体类型抓进来
+```
+
+* 保存行为（函数闭包）
+
+```swift
+let _add: (T) -> Void
+// 不在关心类型，只关系能不能做这个操作
+```
+
+* 对外统一接口
+
+```swift
+func add(_ item: T) {
+    _add(item)
+}
+// 所有类型统一调用方式
+```
+
+**完整实现**
+
+* 定义类型擦除结构
+
+```swift
+class AnyContainer<T>: Container {
+    private let _add: (T) -> Void
+
+    init<C: Container>(_ container: C) where C.Item == T {
+        _add = container.add
+    }
+
+    func add(_ item: T) {
+        _add(item)
+    }
+}
+```
+
+* 具体实现
+
+```swift
+struct IntBox: Container {
+    func add(_ item: Int) {
+        print("IntBox:", item)
+    }
+}
+
+struct StringBox: Container {
+    func add(_ item: String) {
+        print("StringBox:", item)
+    }
+}
+```
+
+* 统一使用
+
+```swift
+let intBox = IntBox()
+let anyBox = AnyContainer(intBox)
+
+anyBox.add(10) // ✅
+```
+
+类型擦除的本质：把协议里面的associatedtype转换为泛型参数。
+
+| **方式**      | **是否保留类型信息** | **是否能调用方法** |
+| ------------- | -------------------- | ------------------ |
+| any Container | ❌ 不知道             | ❌                  |
+| 泛型          | ✅ 知道               | ✅                  |
+| 类型擦除      | ❌ 外部不知道         | ✅ 内部知道         |
+
+```swift
+类型擦除是将带有 associatedtype 的协议包装成一个具体类型，通过泛型固定住关联类型，并通过 closure 保存原始对象的方法实现，从而实现统一调用接口。
+
+它解决的问题是：协议本身因为关联类型不确定无法作为变量使用，而类型擦除通过“把关联类型转成泛型参数”让类型在编译期确定，同时对外隐藏具体实现。
+```
+
+
+
+### 静态派发和动态派发的理解
+
+静态派发（static dispatch）：编译时就知道调用哪个方法
+
+动态派发（dynamic dispatch）：运行时才决定调用哪个方法
+
+以打电话形象的理解就是：静态派发知道具体要打电话给谁，直接拨号，而动态派发你只知道公司，需要客服给你转接到具体的某个人。
+
+**例子**
+
+```swift
+// 静态派发
+struct Dog {
+    func speak() {
+        print("Woof")
+    }
+}
+
+let d = Dog()
+d.speak()
+// 编译时就已经确定类型，Dog.speak(), 运行时不用再查找
+
+// 动态派发
+protocol Animal {
+    func speak()
+}
+
+struct Dog: Animal {
+    func speak() {
+        print("Woof")
+    }
+}
+
+struct Cat: Animal {
+    func speak() {
+        print("Meow")
+    }
+}
+
+let a: Animal = Dog()
+a.speak()
+// 编译器只知道a是Animal，但不知道是Dog还是Cat，必须在实际运行时查找实际类型-> 调用对应的方法。
+```
+
+**Swift中哪些是静态派发**
+
+* struct/enum
+
+```swift
+struct A {
+    func test() {}
+}
+```
+
+* 泛型
+
+```swift
+func test<T: Animal>(_ a: T) {
+    a.speak()
+}
+// 编译期展开,所以是静态派发
+test(Dog)
+test(Cat)
+```
+
+* some(不透明类型)
+
+```swift
+func getAnimal() -> some Animal
+// 实际是类型是固定的，编译器知道-> 静态派发
+```
+
+**动态派发**
+
+* any（存在类型）
+
+```swift
+let a: any Animal = Dog()
+a.speak() 
+// 运行时确定
+```
+
+* class + override
+
+```swift
+class Animal {
+    func speak() {
+        print("Animal")
+    }
+}
+
+class Dog: Animal {
+    override func speak() {
+        print("Dog")
+    }
+}
+
+let a: Animal = Dog()
+a.speak() // Dog
+
+// runtime决定
+```
+
+* @objc/dynamic
+
+```swift
+class A {
+    @objc dynamic func test() {}
+}
+// 强制走runtime
+```
+
+* 类型擦除
+
+```swift
+class AnyContainer<T> {
+    private let _add: (T) -> Void
+}
+// _add是closure，相当于函数指针，运行时调用
+```
+
+* AnyView
+
+```swift
+AnyView(Text("Hello"))
+// 内部存closure，存render函数，渲染时再调用
+```
+
+**优缺点**
+
+静态派发更快（没有查找过程），编译器可以优化（inline、清除调用），类型安全更强。
+
+缺点不灵活，类型必须固定。
+
+
+
+**动态派发使用场景**
+
+* 多态
+
+```swift
+let animals: [any Animal]
+```
+
+* 插件系统
+
+```swift
+let plugins: [any Plugin]
+```
+
+* SwiftUI
+
+```swift
+AnyView
+// UI类型不固定
+```
+
+在Swift中，静态派发是编译器就确定调用目标，常见于struct，泛型和some类型，性能更好。而动态派发是在运行时根据实际类型查找方法实现，常见于any、class和类型擦除。像AnyView和AnyPublisher本质上就是通过类型擦除引入动态派发，以换取更强的抽象能力和灵活性。
+
+**class是否动态派发**
+
+class默认是动态派发（vtable)，但是某些情况下（final，private，编译器可推断不可重写），可以被优化为静态派发。是否发生动态派发，不完全取决于有没有继承，而是取决于方法是否可被override。
+
+一句话：是否动态派发，看这个方法在编译期是否确定不会被override。
+
+```swift
+// 情况1: 普通class，即使没有写子类，编译器也必须假设，所以必须使用动态派发
+class Animal {
+    func speak() {
+        print("Animal")
+    }
+}
+```
+
+```swift
+// 静态派发情况：
+// final修饰
+final class Animal {
+    func speak() {
+        print("Animal")
+    }
+}
+// 不允许继承，编译器确定不会被override，可以静态派发
+
+class Animal {
+    final func speak() {
+        print("Animal")
+    }
+}
+// 即使class可被继承，但是这个方法不能被override，静态派发。
+
+// private/fileprivate 修饰
+class Animal {
+    private func speak() {}
+}
+// 外部无法override，编译器确定不会被重写，静态派发。
+
+// class调用流程：动态派发
+对象 → isa 指针 → vtable → 方法地址 → 调用
+// final优化后
+直接函数地址调用（类似 struct）
+```
+
+| **情况**        | **是否动态派发** |
+| --------------- | ---------------- |
+| 普通 class 方法 | ✅ 动态           |
+| override 方法   | ✅ 动态           |
+| final class     | ❌ 静态           |
+| final func      | ❌ 静态           |
+| private func    | ❌ 静态           |
+| struct 方法     | ❌ 静态           |
+
+> Swift 中 class 默认使用动态派发，因为它支持继承和方法重写，编译器必须在运行时通过 vtable 查找具体实现。即使当前没有子类，编译器也必须假设未来可能被继承。只有在编译器可以确定方法不会被 override 的情况下，比如使用 final、private，或者 final class，才可以优化为静态派发。
+
+
+
+### struct和class方法调用区别理解
+
+**直观区别**
+
+struct调用方法操作的是拷贝的值，而class调用方法操作的是同一块内存。
+
+```swift
+// struct值类型
+struct Counter {
+    var value = 0
+    
+    mutating func increment() {
+        value += 1
+    }
+}
+
+var c1 = Counter()
+var c2 = c1
+
+c2.increment()
+
+print(c1.value) // 0
+print(c2.value) // 1
+
+// class引用类型
+class Counter {
+    var value = 0
+    
+    func increment() {
+        value += 1
+    }
+}
+
+let c1 = Counter()
+let c2 = c1
+
+c2.increment()
+
+print(c1.value) // 1
+print(c2.value) // 1
+```
+
+**方法调用本身的区别**
+
+struct静态派发，class动态派发。
+
+struct没有继承，方法不被重写，而class有继承和多态，方法可能被重写，必须运行时决定。
+
+**内存层面的区别**
+
+struct：栈内存、值拷贝，直接操作的当前值。
+
+class：堆内存+引用，通过引用找到对象 -> 再调用方法
+
+**struct和class使用场景**
+
+struct：
+
+* 数据模型（model）
+* 不需要共享状态
+* 希望高性能
+* SwiftUI View（必须是struct）
+
+class：
+
+* 需要共享状态
+* 需要继承、多态
+* UIKit等
+
+> struct 和 class 在方法调用上的核心区别在于派发机制和内存语义。struct 是值类型，方法调用采用静态派发，编译期就能确定调用目标，性能更好；而 class 是引用类型，支持继承和方法重写，因此方法调用通常采用动态派发，需要在运行时通过 vtable 查找具体实现。此外，struct 的方法操作的是值拷贝，而 class 操作的是共享的引用对象。
 
 
 
@@ -1787,9 +2450,138 @@ deinit {
 
 
 
+### AppDelegate Vs SceneDelegate理解
 
+`AppDelegate`管理应用级生命周期，`SceneDelegate`管理界面级生命周期（窗口）。
 
+| **角色**      | **管什么**             | **生命周期粒度** |
+| ------------- | ---------------------- | ---------------- |
+| AppDelegate   | 整个 App               | 全局             |
+| SceneDelegate | 一个 UI 场景（window） | 局部             |
 
+iOS13引入`SceneDelegate`多窗口，一个App可以有多个界面实例。每个界面有独立的生命周期。
+
+**生命周期**
+
+* AppDelegate生命周期
+
+1. 启动阶段
+
+```swift
+func application(
+  _ application: UIApplication,
+  didFinishLaunchingWithOptions launchOptions: ...
+) -> Bool
+// app启动完成（最重要）
+```
+
+2. 状态变化
+
+```swift
+applicationWillResignActive
+applicationDidEnterBackground
+applicationWillEnterForeground
+applicationDidBecomeActive
+```
+
+3. 终止
+
+```swift
+applicationWillTerminate
+```
+
+* SceneDelegate生命周期
+
+1. 创建Scene
+
+```swift
+scene(_:willConnectTo:options:)
+// 初始化UIWindow（核心入口）
+```
+
+2. 前后台切换
+
+```swift
+sceneWillEnterForeground
+sceneDidBecomeActive
+sceneWillResignActive
+sceneDidEnterBackground
+```
+
+3. 销毁
+
+```swift
+sceneDidDisconnect
+```
+
+* 调用顺序
+
+1. app冷启动流程
+
+```swift
+1. AppDelegate.application(didFinishLaunching)
+2. AppDelegate.configurationForConnectingSceneSession
+3. SceneDelegate.scene(willConnectTo)
+4. SceneDelegate.sceneWillEnterForeground
+5. SceneDelegate.sceneDidBecomeActive
+```
+
+2. 进入后台
+
+```swift
+1. SceneDelegate.sceneWillResignActive
+2. SceneDelegate.sceneDidEnterBackground
+3. AppDelegate.applicationDidEnterBackground
+```
+
+3. 回到前台
+
+```swift
+1. AppDelegate.applicationWillEnterForeground
+2. SceneDelegate.sceneWillEnterForeground
+3. SceneDelegate.sceneDidBecomeActive
+```
+
+4. 冷启动完整运行流程
+
+```swift
+App 启动
+ ↓
+AppDelegate.didFinishLaunching
+ ↓
+创建 Scene Session
+ ↓
+SceneDelegate.willConnectTo
+ ↓
+创建 UIWindow
+ ↓
+设置 rootViewController
+ ↓
+window.makeKeyAndVisible()
+ ↓
+sceneDidBecomeActive
+```
+
+* 职责划分
+
+1. AppDelegate负责全局、一次性与UI无关。
+
+```swift
+•	SDK 初始化（Firebase、Analytics）
+•	Push 注册
+•	App 配置
+•	Deep Link（全局处理）
+•	App 生命周期监听
+```
+
+2. SceneDelegate: UI和窗口相关
+
+```swift
+•	创建 UIWindow
+•	设置 rootViewController
+•	页面恢复（state restoration）
+•	Scene 级 Deep Link 处理
+```
 
 
 
@@ -1843,6 +2635,7 @@ ObservableObject是一个协议，表示：这个对象可以被SwiftUI视图观
 
 ```swift
 public protocol ObservableObject: AnyObject {
+  // 这个是UI更新的关键入口
     var objectWillChange: ObservableObjectPublisher { get }
 }
 ```
@@ -1853,9 +2646,15 @@ public protocol ObservableObject: AnyObject {
 
 
 
+**@StateObject**
+
+用来持有一个`ObservableObject`，生命周期是View管理（只初始化一次），会订阅对象的变化。
+
+
+
 **@Published是什么**
 
-@Published是一个属性包裹器（property wrapper），用来声明当这个属性发生变化时，要通知所有订阅者（包括SwiftUI视图）。
+用在`ObservableObject`理的属性上，@Published是一个属性包裹器（property wrapper），用来声明当这个属性发生变化时，要通知所有订阅者（包括SwiftUI视图）。
 
 ```swift
 @Published var name = "Matt"
@@ -1962,6 +2761,436 @@ class UserViewModel: ObservableObject {
 ```
 
 SwiftUI 监听 objectWillChange，当 send() 被调用时，重新渲染相关视图。
+
+
+
+**完整更新流程**
+
+1. View初始化
+
+```swift
+@StateObject var vm = ViewModel()
+```
+
+* 创建viewModel实例
+* 订阅vm.objectWillChange
+* 把这个订阅绑定到View的刷新机制
+
+```swift
+vm.objectWillChange
+   .sink { _ in
+       triggerViewUpdate()
+   }
+```
+
+2. @Published属性被修改
+
+```swift
+vm.count += 1
+```
+
+@Published背后做了什么，其等价于（简化版）
+
+```swift
+var count: Int {
+    willSet {
+        objectWillChange.send()
+    }
+}
+```
+
+3. 发送变更通知
+
+```swift
+objectWillChange.send()
+```
+
+这个Publisher会通知所有订阅者（也就是View）
+
+4. SwiftUI收到通知
+
+```swift
+收到 objectWillChange
+    ↓
+标记 View 为 dirty（需要刷新）
+    ↓
+进入下一轮 runloop
+    ↓
+重新计算 body
+```
+
+5. 重新计算body
+
+```swift
+旧：Text("0")
+新：Text("1")
+```
+
+只更新Text，不重建整个View。
+
+```swift
+1.	@StateObject 持有 ObservableObject，并订阅 objectWillChange
+2.	@Published 在属性变化时自动调用 objectWillChange.send()
+3.	SwiftUI 收到通知后：
+    •	标记 View 需要刷新
+    •	在下一轮 runloop 重新执行 body
+4.	SwiftUI 对新旧 View 做 diff
+5.	只更新变化的 UI 部分
+```
+
+**@Published 负责发通知，@StateObject 负责订阅通知，SwiftUI 收到通知后重新计算 body 并 diff 更新 UI。**
+
+
+
+### SwiftUI状态系统@State，@StateObject以及@Environment理解
+
+这些属性包裹器本质在做两件事：
+
+* 存储状态（state storage，不在View struct本身）
+* 建立依赖关系（依赖变化 -> 触发body重新计算）
+
+View是struct（值类型），状态不能直接存储在view里。
+
+**@State：View内部状态**
+
+```swift
+@State var count = 0
+// 编译后大致编程
+private var _count: State<Int>
+var count: Int {
+  get { _count.wrappedValue }
+  nonmutating set { _count.wrappedValue = newValue }
+}
+// _count真正存储数据（存在SwiftUI的State Storage中）
+// count 只是访问入口
+
+// 底层机制
+State<T>
+   ↓
+SwiftUI 内部存储（类似一个全局状态表）
+   ↓
+通过 View identity 找到对应状态
+
+struct CounterView: View {
+    @State var count = 0
+
+    var body: some View {
+        VStack {
+            Text("\(count)")
+            Button("Add") {
+                count += 1
+            }
+        }
+    }
+}
+
+// 触发更新流程
+count 修改
+   ↓
+State storage 更新
+   ↓
+标记 View dirty
+   ↓
+重新计算 body
+```
+
+通常用于view内部的简单状态。
+
+
+
+**@StateObject：持有引用类型（ViewModel）**
+
+```swift
+@StateObject var vm = ViewModel()
+// 编译后类似
+private var _vm: StateObject<ViewModel>
+private var vm {
+  _vm.wrappedValue
+}
+
+// StateObject内部做了两件事
+持有ViewModel（保证生命周期）
+订阅ObjectWillChange
+
+// 内部结构
+StateObject
+   ↓
+ObservedObjectBox
+   ↓
+订阅 objectWillChange
+   ↓
+触发 View 刷新
+
+// 示例
+class CounterVM: ObservableObject {
+    @Published var count = 0
+}
+
+struct ContentView: View {
+    @StateObject var vm = CounterVM()
+
+    var body: some View {
+        VStack {
+            Text("\(vm.count)")
+            Button("Add") {
+                vm.count += 1
+            }
+        }
+    }
+}
+```
+
+
+
+**@Environment：从环境中读取值**
+
+```swift
+@Environment(.\colorScheme) var scheme
+
+// 编译后类似
+private var _scheme: Enviroment<ColorScheme>
+private var scheme {
+  _scheme.wrappedValue
+}
+
+// 本质
+EnvironmentKey + EnvironmentValues(类似字典)
+
+// SwiftUI环境系统
+EnvironmentValues（一个 Key-Value 容器）
+        ↓
+从父 View 逐层传递
+        ↓
+子 View 读取
+
+// 使用示例
+struct ThemeView: View {
+    @Environment(\.colorScheme) var scheme
+
+    var body: some View {
+        Text(scheme == .dark ? "Dark" : "Light")
+    }
+}
+
+// 自定义Environment
+struct MyKey: EnvironmentKey {
+    static let defaultValue: String = "Default"
+}
+
+extension EnvironmentValues {
+    var myValue: String {
+        get { self[MyKey.self] }
+        set { self[MyKey.self] = newValue }
+    }
+}
+
+// 使用
+// 注入
+MyView()
+    .environment(\.myValue, "Hello")
+
+// 读取
+@Environment(\.myValue) var value
+
+// 更新机制
+Environment 改变
+   ↓
+所有依赖该 key 的 View
+   ↓
+重新计算 body
+
+// 使用场景
+全局/跨层级共享数据
+•	主题
+•	语言
+•	用户信息（轻量）
+```
+
+
+
+### Property Wrapper属性包裹器理解
+
+```swift
+@proprtyWrapper
+struct MyWrapper {
+  var wrappedValue: Int
+}
+
+// 使用
+@MyWrapper var value = 10
+
+// 编译器会帮你做什么，其会展开为
+private var _value = MyWrapper(wrappedValue: 10)
+var value: Int {
+  get: { _value.wrappedValue }
+  set: { _value.wrappedValue = newValue }
+}
+// @Wrapper var x
+// _x -> 真正存储（Wrapper类型）
+// x -> wrappedValue(你平时使用的值)
+
+// $是怎么来的
+// 如果Wrapper多写一个属性
+@propertyWrapper
+struct MyWrapper {
+  var wrappedValue: Int
+  var projectedValue: String {
+    return "current value: \(wrappedValue)"
+  }
+}
+
+// 编译器会再生成一个
+var $value: String {
+  _value.projectedValue
+}
+// $是语法糖，本质是
+wrapper.projectedValue
+```
+
+**统一模型**
+
+任何property wrapper都是
+
+```swift
+@Wrapper var x
+// 展开为
+_x -> Wrapper类型（真正存储）
+x -> wrappedValue(值)
+$x -> projectedValue(扩展能力)
+```
+
+由于每个wrapper都可以自定义projectedValue类型，所有$每种都不一样。
+
+
+
+**SwiftUI常见Wrapper**
+
+* @State
+
+```swift
+@State var count = 0
+// 编译后
+_count: State<Int>
+count: Int
+$count: Binding<Int>
+
+// SwiftUI的设计目标是允许子View修改父View状态。所以$count是可读写的引用。
+// Binding本质
+struct Binding<Value> {
+  let get: () -> Value
+  let set: (Value) -> Void
+}
+
+$count其实是
+Binding {
+  get: { count }
+  set: { count = $0 }
+}
+```
+
+> $vm 不是ViewModel
+>
+> 而是
+>
+> ```swift
+> ObservedObject<UserVM>.Wrapper
+> ```
+>
+> SwiftUI 内部专门定义的一个 Wrapper 类型。
+>
+> 类似
+>
+> ```swift
+> struct Wrapper {
+>     subscript<Subject>(
+>         dynamicMember keyPath: ReferenceWritableKeyPath<ObjectType, Subject>
+>     ) -> Binding<Subject>
+> }
+> ```
+>
+> 核心作用：**自动把对象属性转化为Binding**
+
+* @Binding
+
+```swift
+@Binding var count: Int
+// 本质只是接收一个Binding，所以$count还是Binding（继续往下传）
+```
+
+* @StateObject
+
+```swift
+@StateObject var vm = ViewModel()
+// 编译后
+_vm: StateObject<ViewModel>
+vm: ViewModel
+$vm: ObservedObject<ViewModel>.Wrapper
+
+// vm是引用类型，SwiftUI不需要Binding整个对象，而是Binding到其内部的@Published对象，所以$vm.name才是Binding
+TextField("name", text: $vm.name)
+
+vm.name   → 值
+vm.$name  → Publisher（数据流）
+但SwiftUI需要的是Binding<String>，所以需要把 vm.name → 转换成 Binding
+
+这里的$vm: ObservedObject<ViewModel>.Wrapper具体做了什么？
+当你写$vm.name
+1.访问$vm
+$vm -> Wrapper
+2.访问name
+$vm.name
+这里不是普通属性访问
+3.动态生成Binding
+Binding(
+    get: { vm.name },
+    set: { vm.name = $0 }
+)
+4.最终结果
+$vm.name → Binding<String>
+
+完整数据流：
+TextField 输入
+   ↓
+Binding.set
+   ↓
+vm.name = 新值
+   ↓
+@Published 触发
+   ↓
+objectWillChange
+   ↓
+View 刷新
+```
+
+* @Published
+
+```swift
+@Published var count = 0
+// 编译后
+count: Int
+$count: Published<Int>.Publisher // $count是数据流
+
+vm.$count
+    .sink { print($0) }
+```
+
+| **Wrapper**     | $xxx **类型** | **本质作用**   |
+| --------------- | ------------- | -------------- |
+| @State          | Binding       | 双向数据       |
+| @Binding        | Binding       | 传递引用       |
+| @StateObject    | Wrapper       | 访问子 Binding |
+| @ObservedObject | Wrapper       | 提供 Binding   |
+| @Published      | Publisher     | 数据流         |
+
+```swift
+$ 放在谁前面，就取谁的 projectedValue。
+wrappedValue（x） → 当前值
+projectedValue（$x） → “额外能力”
+```
+
+
+
+
 
 
 
@@ -4042,11 +5271,588 @@ scrollView.contentInset.top = 88
 
 
 
+### iOS架构理解
+
+**核心目标**
+
+iOS架构设计的核心目标：解耦、可维护、可测试、可扩展、可复用。
+
+* 解耦（Decoupling）：模块之间互不依赖。
+
+例如：View不直接依赖网络层，Controller不处理业务逻辑。
+
+* 可维护（Maintainability）：修改一个模块，不影响其他模块，代码容易理解。
+* 可测试（Testability）：可独立测试ViewModel、UserCase和Service
+* 可扩展（Scalability）：新需求不需要大改旧代码。
+* 可复用（Resusability）：组件可复用，网络层和业务逻辑。
+
+好的架构不是为了复杂，而是为了让复杂系统变得简单可控。
+
+**常见架构**
+
+* MVC
+
+```swift
+// 各部分职责
+Model（数据）：用户数据、接口数据
+View（界面）：UILabel、UITextfield、UIButton
+Controller（控制器）：处理所有业务逻辑
+
+// 实力流程
+View（点击按钮）
+   ↓
+Controller（处理点击）
+   ↓
+调用 API（请求数据）
+   ↓
+更新 Model
+   ↓
+Controller 更新 View
+
+// 优缺点
+优点：简单、上手快
+缺点：Controller编程上帝类，难维护、难测试
+```
+
+* MVP
+
+```swift
+MVP = Model + View + Presenter
+核心思想，Controller不写逻辑，用Presenter
+View：只负责显示
+Presenter：处理所有逻辑
+Model：数据
+
+// 流程
+View（点击按钮）
+   ↓
+Presenter（处理逻辑）
+   ↓
+调用 Model / API
+   ↓
+Presenter 更新 View
+
+// 示例
+protocol LoginView {
+    func showError()
+    func goToHome()
+}
+
+class LoginPresenter {
+    weak var view: LoginView?
+
+    func login(username: String, password: String) {
+        API.login(username, password) { result in
+            if result.success {
+                self.view?.goToHome()
+            } else {
+                self.view?.showError()
+            }
+        }
+    }
+}
+
+class LoginVC: UIViewController, LoginView {
+    let presenter = LoginPresenter()
+
+    func loginTapped() {
+        presenter.login(username: "a", password: "b")
+    }
+}
+
+// 优缺点：
+优点：逻辑从VC分离，更好测试
+缺点： View 和 Presenter耦合（通过接口），Presenter可能变很大
+```
+
+* MVVM
+
+```swift
+MVVM = Model + View + ViewModel
+核心思想：数据驱动UI（自动绑定）
+
+// 各部分职责
+View: UI
+ViewModel: 数据 + 逻辑
+Model： 数据
+ViewModel不直接操作View，而是绑定数据
+
+// 流程
+View（点击）
+   ↓
+ViewModel（处理逻辑）
+   ↓
+更新数据（state）
+   ↓
+View 自动更新（绑定）
+
+// 示例
+class LoginViewModel: ObservableObject {
+    @Published var isLoginSuccess = false
+
+    func login() {
+        API.login { result in
+            self.isLoginSuccess = result.success
+        }
+    }
+}
+
+// View
+@StateObject var vm = LoginViewModel()
+
+Button("Login") {
+    vm.login()
+}
+
+if vm.isLoginSuccess {
+    Text("Success")
+}
+
+// 优缺点：
+解耦很好，支持响应式（RxSwift、Combine），已测试。
+学习成本高，可能过度设计。
+```
+
+* VIPER
+
+| VIPER      | 类比     | 作用             |
+| ---------- | -------- | ---------------- |
+| View       | 用户界面 | 显示UI、接收点击 |
+| Presenter  | 客服     | 控制流程         |
+| Interactor | 厨房     | 处理业务逻辑     |
+| Entity     | 菜       | 数据模型         |
+| Router     | 配送     | 页面跳转         |
+
+```swift
+VIPER = View + Insteractor + Presenter + Entiry + Router
+核心思想：极致解耦（每个职责拆分到最细）。
+把一个页面拆成 5 个“只做一件事”的角色
+
+// 比喻
+你点外卖：
+1.	你（View） → 下单
+2.	客服（Presenter） → 帮你转达
+3.	厨房（Interactor） → 做饭
+4.	菜品（Entity） → 数据
+5.	配送员（Router） → 把你送到“下一个页面”
+
+// 完整流程
+View
+ ↓
+Presenter
+ ↓
+Interactor
+ ↓
+API
+
+API 返回
+ ↑
+Interactor
+ ↑
+Presenter
+ ↓         ↓
+View     Router
+
+// 示例
+// View(Controller)
+class LoginViewController: UIViewController {
+
+    var presenter: LoginPresenter!
+
+    @IBAction func loginTapped() {
+        presenter.login(username: "a", password: "b")
+    }
+
+    func showError() {
+        print("error")
+    }
+}
+
+// Presenter: 核心调度
+class LoginPresenter {
+
+    var view: LoginView?
+    var interactor: LoginInteractor?
+    var router: LoginRouter?
+
+    func login(username: String, password: String) {
+        interactor?.login(username, password)
+    }
+
+    func loginSuccess() {
+        view?.showSuccess()
+        router?.goToHome()
+    }
+
+    func loginFailed() {
+        view?.showError()
+    }
+}
+
+// Interactor: 业务逻辑
+class LoginInteractor {
+
+    var presenter: LoginPresenter?
+
+    func login(_ username: String, _ password: String) {
+        API.login(username, password) { success in
+            if success {
+                self.presenter?.loginSuccess()
+            } else {
+                self.presenter?.loginFailed()
+            }
+        }
+    }
+}
+
+// Entity
+struct User {
+    let name: String
+}
+
+// Router: 跳转
+class LoginRouter {
+
+    func goToHome() {
+        // push / present
+    }
+}
+
+// 优缺点
+文件爆炸，开发成本高，学习成本高。
+适合大型项目、多人协助、复杂业务。不适合小项目、快速开发。
+```
 
 
 
+### 策略模式理解
+
+**什么是策略模式**（是什么）
+
+策略模式是将一组可互换的算法（策略）封装起来，并且可以再运行时自由切换。
+
+* 定义一系列算法（策略）
+* 把他们一个个封装起来
+* 让他们可以相互替换
+* 客户端无需担心具体替换
+
+**核心思想（为什么）**
+
+策略思想要解决的问题是：避免大量if/else、switch分支。
+
+策略模式的思路：把算法变化抽离出来。变成
+
+* 每种支付方式 = 一个策略
+* 外部只负责选择策略，不负责实现
+
+```swift
+func pay(type: String) {
+    if type == "alipay" {
+        // 支付宝逻辑
+    } else if type == "wechat" {
+        // 微信逻辑
+    } else if type == "apple" {
+        // Apple Pay
+    }
+}
+// 问题
+•	代码膨胀
+•	难扩展（新增支付方式要改原代码）
+•	不符合开闭原则（OCP）
+```
+
+**结构设计（怎么用）**
+
+策略模式一般包含3个角色：
+
+* Strategy（策略协议）
+
+```swift
+protocol PaymentStrategy {
+    func pay(amount: Double)
+}
+```
+
+* Concrete Strategy(具体策略)
+
+```swift
+class AlipayStrategy: PaymentStrategy {
+    func pay(amount: Double) {
+        print("使用支付宝支付 \(amount)")
+    }
+}
+
+class WechatStrategy: PaymentStrategy {
+    func pay(amount: Double) {
+        print("使用微信支付 \(amount)")
+    }
+}
+```
+
+* Context(上下文)
+
+```swift
+class PaymentContext {
+    private var strategy: PaymentStrategy
+    
+    init(strategy: PaymentStrategy) {
+        self.strategy = strategy
+    }
+    
+    func setStrategy(_ strategy: PaymentStrategy) {
+        self.strategy = strategy
+    }
+    
+    func executePay(amount: Double) {
+        strategy.pay(amount: amount)
+    }
+}
+```
+
+* 使用
+
+```swift
+let context = PaymentContext(strategy: AlipayStrategy())
+context.executePay(amount: 100)
+
+context.setStrategy(WechatStrategy())
+context.executePay(amount: 200)
+```
+
+**使用场景**
+
+* 支付方式
+
+1. 支付宝 / 微信 / Apple Pay
+
+2. 不同策略 = 不同支付实现
+
+* 网络请求策略
+
+1. 缓存策略（Cache/Netowrk First）
+2. 重试策略
+3. 限流策略
+
+```swift
+// 场景：缓存 + 网络策略
+比如：
+	•	只走缓存
+	•	只走网络
+	•	先缓存再网络（最常见）
+	•	网络失败回退缓存
+
+// step1: 变化点 -> 请求数据的获取方式
+
+// step2: 定义策略
+protocol RequestStrategy {
+    func request(
+        cache: () -> Data?,
+        network: () async throws -> Data
+    ) async throws -> Data
+}
+
+// step3: 具体策略
+// Cache First
+class CacheFirstStrategy: RequestStrategy {
+    func request(
+        cache: () -> Data?,
+        network: () async throws -> Data
+    ) async throws -> Data {
+        
+        if let data = cache() {
+            return data
+        }
+        
+        return try await network()
+    }
+}
+// Network First
+class NetworkFirstStrategy: RequestStrategy {
+    func request(
+        cache: () -> Data?,
+        network: () async throws -> Data
+    ) async throws -> Data {
+        do {
+            return try await network()
+        } catch {
+            if let data = cache() {
+                return data
+            }
+            throw error
+        }
+    }
+}
+
+// step4: Context
+class APIClient {
+    var strategy: RequestStrategy
+    
+    init(strategy: RequestStrategy) {
+        self.strategy = strategy
+    }
+}
+
+•	类似 URLCache / Alamofire RequestInterceptor
+•	可以动态切换（弱网 / 强网环境）
+```
+
+* 图片加载策略（类似SDWebImage）
+
+1. 内存缓存
+2. 磁盘缓存
+3. 网络加载
+
+* 排序过滤逻辑
+
+```swift
+// 场景
+•	商品排序（价格 / 销量 / 时间）
+•	数据过滤（有效 / 无效 / 权限）
+
+// step1: 变化点-> 排序规则、过滤规则
+
+// step2: 策略协议
+protocol SortStrategy {
+    func sort(_ items: [Item]) -> [Item]
+}
+
+// step3: 实现
+struct Item {
+    let price: Double
+    let sales: Int
+}
+// 按价格排序
+class PriceSortStrategy: SortStrategy {
+    func sort(_ items: [Item]) -> [Item] {
+        items.sorted { $0.price < $1.price }
+    }
+}
+// 按销量排序
+class SalesSortStrategy: SortStrategy {
+    func sort(_ items: [Item]) -> [Item] {
+        items.sorted { $0.sales > $1.sales }
+    }
+}
+
+// step3: Context
+class SortContext {
+    var strategy: SortStrategy
+    
+    func execute(items: [Item]) -> [Item] {
+        strategy.sort(items)
+    }
+}
+
+•	比 if-else 更易扩展
+•	在电商 / 列表页非常常见
+```
+
+* 动画策略（UIKit/SwiftUI）
+
+1. 不同动画曲线
+2. 不同转场方式
+
+```swift
+// 场景：
+•	不同动画效果
+•	不同转场方式
+
+// step1:变化点 -> 动画实现方式
+
+// step2: 策略协议
+protocol AnimationStrategy {
+    func animate(view: UIView)
+}
+
+// step3: 实现
+// Fade 动画
+class FadeAnimation: AnimationStrategy {
+    func animate(view: UIView) {
+        view.alpha = 0
+        UIView.animate(withDuration: 0.3) {
+            view.alpha = 1
+        }
+    }
+}
+// Scale动画
+class ScaleAnimation: AnimationStrategy {
+    func animate(view: UIView) {
+        view.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        UIView.animate(withDuration: 0.3) {
+            view.transform = .identity
+        }
+    }
+}
+```
 
 
+
+* 表单验证策略
+
+```swift
+// 场景
+•	手机号
+•	邮箱
+•	密码强度
+
+// step1: 变化点，验证规则
+
+// step2: 策略协议
+protocol ValidationStrategy {
+    func validate(_ text: String) -> Bool
+}
+
+// step3: 实现
+// 手机号
+class PhoneValidation: ValidationStrategy {
+    func validate(_ text: String) -> Bool {
+        return text.count == 11
+    }
+}
+
+// 邮箱
+class EmailValidation: ValidationStrategy {
+    func validate(_ text: String) -> Bool {
+        return text.contains("@")
+    }
+}
+
+// step4: Context
+class Validator {
+    private var strategies: [ValidationStrategy] = []
+    
+    func add(_ strategy: ValidationStrategy) {
+        strategies.append(strategy)
+    }
+    
+    func validate(_ text: String) -> Bool {
+        return strategies.allSatisfy { $0.validate(text) }
+    }
+}
+// 支持组合策略：必填 + 格式 + 长度
+validator.add(RequiredValidation())
+validator.add(EmailValidation())
+在 React Native 项目中，我把表单验证抽象为策略模式，使验证逻辑可复用，并支持组合验证规则，减少了大量重复代码。
+```
+
+**优缺点**
+
+优点：
+
+* 符合开闭合原则（OCP）：新增策略不用改代码
+* 消除if-else：结构更清晰
+* 提高扩展性：可以动态切换策略
+* 解耦：使用者不关心具体实现
+
+缺点：
+
+* 类数量变多
+* 需要理解成本
+* 客户端需要策略的存在
+
+> 策略模式的核心是“分离变化”。在实际开发中，我会优先识别哪些逻辑会变化，比如请求策略、排序规则、动画效果、验证规则，然后通过 protocol 抽象行为，将不同实现封装为独立策略。
+>
+> 在 Swift 中，我也会结合 protocol + 泛型 + 闭包优化策略模式，使其更加轻量化，而不是一味增加类数量。
 
 
 
